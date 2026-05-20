@@ -8,6 +8,7 @@ data/*
 !data/sites_with_2018.csv
 data_cleaned/*
 results/*
+results (not reproducible)/*
 !results/plots/
 results/plots/*
 !results/plots/Qle_rmse_daily_cdf.png
