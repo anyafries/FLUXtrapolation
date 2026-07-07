@@ -8,13 +8,20 @@ Usage:
     python eval.py --setting spatial-easy --target GPP
 """
 
+import json
 import os
 import pandas as pd
 
 from dataloader import load_predictions
 from utils.eval_utils import load_metrics, compute_and_save_metrics
 from utils.plots import plot_metric_grid, plot_cdf_grid, create_html_leaderboard
-from utils.utils import setup_logging, find_available_experiments
+from utils.utils import (
+    setup_logging,
+    find_available_experiments,
+    get_best_rmse_path,
+    get_metrics_path,
+    save_csv,
+)
 
 logger = setup_logging(__name__)
 
@@ -24,21 +31,52 @@ display_names = {
     "TA40": "temperature"
 }
 
+def add_regret_column(metrics_df, setting, target, metrics_path):
+    """Ensure metrics_df has a 'regret' column.
+
+    If missing, join the per-site OOB-oracle baseline (best_rmse) from the cached
+    JSON, compute regret = rmse - best_rmse, and rewrite the metrics CSV in place.
+    If the column already exists the df is returned untouched (no rewrite); if the
+    oracle baseline is absent a warning is logged and regret is skipped.
+    """
+    if metrics_df is None or 'regret' in metrics_df.columns:
+        return metrics_df
+
+    best_path = get_best_rmse_path()
+    if not os.path.exists(best_path):
+        logger.warning(f"No oracle baseline at {best_path}; skipping regret. "
+                       f"Run compute_oracle.py first.")
+        return metrics_df
+
+    with open(best_path) as f:
+        best_df = pd.DataFrame(json.load(f))
+    best_df = best_df[(best_df['setting'] == setting) &
+                      (best_df['target'] == target)][['scale', 'env', 'best_rmse']]
+
+    merged = metrics_df.merge(best_df, on=['scale', 'env'], how='left')
+    merged['regret'] = merged['rmse'] - merged['best_rmse']
+    merged = merged.drop(columns=['best_rmse'])   # persist regret only
+    save_csv(merged, metrics_path)                # rewrite in place
+    return merged
+
+
 def get_metrics(setting, target, model_name, val_strategy, rerun=False):
-    """Get metrics for an experiment, computing if necessary."""
+    """Get metrics for an experiment, computing if necessary.
+
+    Also ensures the metrics carry a persisted 'regret' column (see
+    add_regret_column), rewriting the CSV once if it predates that column.
+    """
+    metrics_path = get_metrics_path(setting, target, model_name, val_strategy)
+
     # Try loading existing metrics
-    if not rerun:
-        metrics_df = load_metrics(setting, target, model_name, val_strategy)
-        if metrics_df is not None:
-            return metrics_df
+    metrics_df = None if rerun else load_metrics(setting, target, model_name, val_strategy)
 
-    # Load predictions
-    predictions_df = load_predictions(setting, target, model_name, val_strategy)
+    # Compute and save metrics if not available
+    if metrics_df is None:
+        predictions_df = load_predictions(setting, target, model_name, val_strategy)
+        metrics_df = compute_and_save_metrics(predictions_df, setting, target, model_name, val_strategy)
 
-    # Compute and save metrics
-    metrics_df = compute_and_save_metrics(predictions_df, setting, target, model_name, val_strategy)
-
-    return metrics_df
+    return add_regret_column(metrics_df, setting, target, metrics_path)
 
 
 def load_all_metrics(settings=None, targets=None, models=None, scales=None, 

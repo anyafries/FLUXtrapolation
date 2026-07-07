@@ -2,6 +2,7 @@
 fluxnet_bench_venv/*
 *pycache*
 .DS_Store
+.claude*
 
 # big folders
 data/*

@@ -53,6 +53,11 @@ def get_params_path(setting, target, model_name, val_strategy):
     return os.path.join(RESULTS_DIR, 'models', f"{exp_name}_best_params.json")
 
 
+def get_best_rmse_path():
+    """Path for the cached per-site OOB-oracle baseline (best) RMSE JSON."""
+    return os.path.join(RESULTS_DIR, 'metrics', 'best_rmse_oracle.json')
+
+
 # ----------- Generic I/O functions -----------
 
 def save_csv(df, path):

@@ -113,11 +113,13 @@ python eval.py --target GPP --val_strategy mean
 | `--target` | `GPP`, `NEE`, `ET`, `all` | `all` |
 | `--setting` | `time-split`, `spatial-easy40`, `TA40` | all |
 | `--model` | model name | all |
-| `--metric` | `rmse`, `mae`, `nse`, `r2_score`, `bias` | `rmse` |
+| `--metric` | `rmse`, `mae`, `nse`, `r2_score`, `bias`, `regret` | `rmse` |
 | `--val_strategy` | `mean`, `max`, `discrepancy` | `mean` |
 | `--rerun` | flag | off | Recompute metrics from saved predictions |
 
 **Metrics** are reported at 6 temporal scales: hourly, weekly seasonal (mean seasonal cycle), anomalies, inter-annual variability, and site mean. The leaderboard iand CDFs are, respectively, at `results/plots/{strategy}/leaderboard_{target}.html` and `results/plots/{strategy}/cdf_{target}_{metric}_{scale}.png`.
+
+**Regret** (`RMSE − best-achievable RMSE`) is added to each metrics CSV automatically during eval, using a per-site in-domain oracle baseline (out-of-bag RandomForest); build/refresh that baseline once with `python compute_oracle.py`.
 
 **Outputs** are saved to `results/`:
 
