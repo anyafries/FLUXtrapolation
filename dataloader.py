@@ -52,6 +52,7 @@ def get_data_split(
     return_colnames=False,
     standardize=False,
     validation_split='default',
+    return_date=False,
 ):
     """
     Get the train/test data for a specific setting.
@@ -72,6 +73,11 @@ def get_data_split(
             features. Defaults to False.
         standardize (bool, optional): Whether to standardize features using
             training set statistics. Defaults to False.
+        return_date (bool, optional): Whether to additionally return, for
+            train/val/test, the observation time as days since 2015-01-01
+            (float, aligned to the feature rows). Used by the anchorboosting
+            model as a continuous time anchor. Appended as the last element of
+            the returned tuple. Defaults to False.
     Returns:
         tuple: xtrain, ytrain, envs_train, xtest, ytest, envs_test
     """
@@ -183,6 +189,18 @@ def get_data_split(
     sites_test = test["site_id"].copy()
     times_test = time_col.loc[test.index]
 
+    # Continuous time anchor: days since 2015-01-01, aligned to feature rows.
+    dates = None
+    if return_date:
+        days = (
+            pd.to_datetime(time_col) - pd.Timestamp("2015-01-01")
+        ).dt.total_seconds() / 86400.0
+        dates = (
+            days.loc[train.index].to_numpy(dtype=np.float64),
+            days.loc[val.index].to_numpy(dtype=np.float64),
+            days.loc[test.index].to_numpy(dtype=np.float64),
+        )
+
     for col in ["site_id", "year", "site_year", "qc_mask"]:
         if col in train.columns:
             train = train.drop(columns=[col])
@@ -221,6 +239,8 @@ def get_data_split(
     )
     if return_colnames:
         out = out + (train.columns[xcols].tolist(), train.columns[ycol].tolist()[0])
+    if return_date:
+        out = out + (dates,)
     return out
 
 

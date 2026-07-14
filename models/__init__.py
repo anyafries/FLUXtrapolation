@@ -86,6 +86,10 @@ def get_model(model_name, params=None):
         from .anchorboosting import AnchorBoosting
         return AnchorBoosting(**params)
 
+    elif model_name == 'anchorboosting-c':
+        from .anchorboosting import AnchorBoosting
+        return AnchorBoosting(anchor_type='continuous', **params)
+
     elif model_name == 'maxrm-mse':
         from .maxrm_rf import MaxRM_RF
         return MaxRM_RF(risk='mse', **params)
@@ -198,7 +202,7 @@ def get_random_params(model_name, n_iter=10, setting=None, target=None):
                 'boosting_type': 'goss',
             }
 
-        elif model_name == 'anchorboosting':
+        elif model_name in ['anchorboosting', 'anchorboosting-c']:
             params = {
                 'gamma': sample_log_uniform(1.0, 100.0, np_rng),
                 'num_boost_round': 1000,

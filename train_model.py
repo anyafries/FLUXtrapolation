@@ -53,15 +53,20 @@ if __name__ == "__main__":
                 logger.info(f"Results for {setting}/{target}/{model_name} already exist. Use --rerun to rerun.")
                 continue
 
-            train, val, test = get_data_split(
+            # The continuous-anchor model needs the observation date as a time anchor
+            need_dates = model_name == 'anchorboosting-c'
+            split = get_data_split(
                 df,
                 setting,
                 target=target,
                 remove_missing_target=True,
                 path=args.path,
                 standardize=model_name in ['robust-lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd'],
-                astorch = model_name in ['mlp', 'gdro', 'coral', 'mmd']
+                astorch = model_name in ['mlp', 'gdro', 'coral', 'mmd'],
+                return_date=need_dates,
             )
+            train, val, test = split[0], split[1], split[2]
+            dates_train = split[3][0] if need_dates else None
             xtrain, ytrain, envs_train = train
             xval, yval, envs_val = val
             xtest = test[0]
@@ -83,6 +88,8 @@ if __name__ == "__main__":
                     fit_args['eval_set'] = [(xval, yval)]
                 if use_envs:
                     fit_args['envs'] = envs_train.values
+                if need_dates:
+                    fit_args['dates'] = dates_train
                 if model_name == 'xgb':
                     fit_args['verbose'] = False
                 if model_name == 'lightgbm':

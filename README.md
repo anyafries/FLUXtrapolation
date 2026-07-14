@@ -97,6 +97,8 @@ Training performs random hyperparameter search and selects the best model under 
 | `gdro` | Group DRO — minimizes worst-group loss (PyTorch) | — |
 | `coral` | CORAL domain generalization (PyTorch) | — |
 | `mmd` | MMD domain generalization (PyTorch) | — |
+| `anchorboosting` | Anchor boosting with one-hot environments as the anchor | `pip install anchorboosting` |
+| `anchorboosting-c` | Anchor boosting with a continuous lat/lon anchor (+ days-since-2015, for `time-split`) | `pip install anchorboosting` |
 
 ---
 
