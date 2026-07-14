@@ -87,6 +87,14 @@ def get_model(model_name, params=None):
         from .coral import MMD
         return MMD(**params)
     
+    elif model_name == 'anchorboosting':
+        from .anchorboosting import AnchorBoosting
+        return AnchorBoosting(**params)
+
+    elif model_name == 'anchorboosting-c':
+        from .anchorboosting import AnchorBoosting
+        return AnchorBoosting(anchor_type='continuous', **params)
+
     elif model_name == 'maxrm-mse':
         from .maxrm_rf import MaxRM_RF
         return MaxRM_RF(risk='mse', **params)
@@ -197,6 +205,16 @@ def get_random_params(model_name, n_iter=10, setting=None, target=None):
                 'verbosity': -1,
                 'n_jobs': 4,
                 'boosting_type': 'goss',
+            }
+
+        elif model_name in ['anchorboosting', 'anchorboosting-c']:
+            params = {
+                'gamma': sample_log_uniform(1.0, 100.0, np_rng),
+                'num_boost_round': 1000,
+                'learning_rate': 0.1,
+                'max_depth': 3,
+                'min_gain_to_split': 0.1,
+                'lambda_l2': sample_log_uniform(1e-3, 1e1, np_rng),
             }
 
         elif model_name in ['mlp', 'gdro', 'coral', 'mmd']:
