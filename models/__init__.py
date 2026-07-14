@@ -4,7 +4,8 @@ Model definitions for FLUXNET benchmark.
 Available models:
   - 'lr'            : Linear Regression (sklearn)
   - 'ridge'         : Ridge Regression (sklearn)
-  - 'xgb'           : XGBoost Regressor
+  - 'xgb'              : XGBoost Regressor
+  - 'xgb_conservative' : XGBoost with conservative feature set (TA, VPD, SW_IN, EVI, NDWI_SWIR2, PFT_*)
   - 'mlp'           : Multi-layer Perceptron
   - 'gdro'          : Group DRO (worst-group loss minimization)
   - 'coral'         : CORAL domain adaptation
@@ -45,6 +46,10 @@ def get_model(model_name, params=None):
     if model_name == 'xgb':
         from xgboost import XGBRegressor
         return XGBRegressor(**params)
+
+    elif model_name == 'xgb_conservative':
+        from .xgb_conservative import XGBConservative
+        return XGBConservative(**params)
     
     elif model_name == 'lr':
         from sklearn.linear_model import LinearRegression
@@ -101,7 +106,7 @@ def get_model(model_name, params=None):
     else:
         raise NotImplementedError(
             f"Model `{model_name}` not implemented. "
-            f"Available models: 'xgb', 'lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'maxrm_mse', 'maxrm_regret'"
+            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'maxrm_mse', 'maxrm_regret'"
         )
 
 
@@ -170,7 +175,7 @@ def get_random_params(model_name, n_iter=10, setting=None, target=None):
                 'random_state': 42,
             }
 
-        elif model_name == 'xgb':
+        elif model_name in ['xgb', 'xgb_conservative']:
             params = {
                 'n_estimators': rng.randint(100, 1000),
                 'max_depth': rng.randint(3, 10),

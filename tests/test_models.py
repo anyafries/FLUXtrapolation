@@ -19,5 +19,6 @@ def test_model(model):
     use_eval_set = 'eval_set' in params
     # OOD models (CORAL, GDRO, MMD) usually require 'envs'
     use_envs = 'envs' in params
+    use_feature_names = 'feature_names' in params
 
-    return use_eval_set, use_envs
+    return use_eval_set, use_envs, use_feature_names

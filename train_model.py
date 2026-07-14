@@ -63,10 +63,11 @@ if __name__ == "__main__":
                 path=args.path,
                 standardize=model_name in ['robust-lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd'],
                 astorch = model_name in ['mlp', 'gdro', 'coral', 'mmd'],
+                return_colnames=True,
                 return_date=need_dates,
             )
-            train, val, test = split[0], split[1], split[2]
-            dates_train = split[3][0] if need_dates else None
+            train, val, test, feature_cols = split[0], split[1], split[2], split[3]
+            dates_train = split[-1][0] if need_dates else None
             xtrain, ytrain, envs_train = train
             xval, yval, envs_val = val
             xtest = test[0]
@@ -80,7 +81,7 @@ if __name__ == "__main__":
             for i, params in enumerate(param_grid):
                 # Get model and train
                 model = get_model(model_name, params)
-                use_eval_set, use_envs = test_model(model)
+                use_eval_set, use_envs, use_feature_names = test_model(model)
 
                 # Build fit arguments dynamically
                 fit_args = {'X': xtrain, 'y': ytrain}
@@ -90,8 +91,10 @@ if __name__ == "__main__":
                     fit_args['envs'] = envs_train.values
                 if need_dates:
                     fit_args['dates'] = dates_train
-                if model_name == 'xgb':
+                if model_name in ['xgb', 'xgb_conservative']:
                     fit_args['verbose'] = False
+                if use_feature_names:
+                    fit_args['feature_names'] = feature_cols
                 if model_name == 'lightgbm':
                     import lightgbm as lgb
                     fit_args['eval_metric'] = 'rmse'

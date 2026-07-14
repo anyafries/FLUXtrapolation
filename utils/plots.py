@@ -16,12 +16,28 @@ PLOTS_DIR = 'results/plots'
 SCALES = ['hourly', 'daily', 'weekly', 'monthly', 'seasonal', 'anom', 'iav']
 
 # Model ordering: lr first, xgb second, then alphabetically
-MODEL_ORDER = ['xgb', 'lightgbm', 'mlp', 
-               'gdro', 'coral', 'mmd', 
-            #    'maxrm_mse', 'maxrm_regret', 
+MODEL_ORDER = ['xgb', 'lightgbm', 'mlp',
+               'gdro', 'coral', 'mmd',
+            #    'maxrm_mse', 'maxrm_regret',
                'lr', 'robust-lr', 'ridge',  'constant']
 color_palette = sns.color_palette("tab10", n_colors=len(MODEL_ORDER))
 MODEL_COLORS = {model: color_palette[i] for i, model in enumerate(MODEL_ORDER)}
+
+# Extra colors for methods not in MODEL_ORDER, assigned in order of appearance
+_EXTRA_PALETTE = sns.color_palette("Set2") + sns.color_palette("tab20")
+
+
+def get_model_colors(models):
+    """Return a color mapping covering all models.
+
+    Known models (in MODEL_ORDER) keep their fixed color; any new methods are
+    assigned distinct colors from a fallback palette, appended in order.
+    """
+    colors = dict(MODEL_COLORS)
+    extras = [m for m in get_ordered_models(models) if m not in MODEL_COLORS]
+    for i, model in enumerate(extras):
+        colors[model] = _EXTRA_PALETTE[i % len(_EXTRA_PALETTE)]
+    return colors
 
 # Setting ordering: time-split, spatial-easy, spatial-hard
 SETTINGS_ORDER = ['time-split', 'spatial-easy40', 'TA40',
@@ -86,9 +102,10 @@ def plot_metric_by_setting(results, target, metric, scale, ax, agg='median',
     categories = SETTINGS_ORDER + [s for s in np.sort(data['setting'].unique()) if s not in SETTINGS_ORDER]
     data['setting'] = pd.Categorical(data['setting'], categories=categories, ordered=True)
     data = data.sort_values('setting')
+    palette = get_model_colors(data['model'].unique())
     for i, plot_func in enumerate([sns.lineplot, sns.scatterplot]):
         plot_func(data=data, x='setting', y=metric, ax=ax, hue='model',
-                  palette=MODEL_COLORS, legend=legend&(i==1))
+                  palette=palette, legend=legend&(i==1))
 
     ax.set_xticks(range(len(categories)))
     ax.set_xticklabels(categories, rotation=90, ha='center')
@@ -161,6 +178,7 @@ def plot_cdf(results, target, metric, scale, setting, ax, xmax=None,
 
     higher_better = is_higher_better(metric)
     models = get_ordered_models(subset['model'].unique())
+    model_colors = get_model_colors(models)
 
     for model_name in models:
         model_data = subset[subset['model'] == model_name]
@@ -175,8 +193,8 @@ def plot_cdf(results, target, metric, scale, setting, ax, xmax=None,
             # Sort ascending for lower-is-better metrics
             sorted_values = np.sort(values)
 
-        ax.plot(sorted_values, np.linspace(0, 1, len(sorted_values)), 
-                label=model_name, color=MODEL_COLORS.get(model_name, 'gray'),
+        ax.plot(sorted_values, np.linspace(0, 1, len(sorted_values)),
+                label=model_name, color=model_colors[model_name],
                 linestyle=linestyle, linewidth=linewidth)
 
     ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
@@ -223,6 +241,7 @@ def plot_quantile(results, target, metric, scale, setting, ax, y_limit=None):
 
     higher_better = is_higher_better(metric)
     models = get_ordered_models(subset['model'].unique())
+    model_colors = get_model_colors(models)
 
     for model_name in models:
         model_data = subset[subset['model'] == model_name]
@@ -240,7 +259,7 @@ def plot_quantile(results, target, metric, scale, setting, ax, y_limit=None):
 
         percentiles = np.linspace(0, 1, len(sorted_values))
         ax.plot(percentiles, sorted_values, label=model_name,
-                color=MODEL_COLORS.get(model_name, 'gray'))
+                color=model_colors[model_name])
 
     ax.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
     ax.grid(True, which='both', linestyle='--', linewidth=0.5)
