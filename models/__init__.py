@@ -98,7 +98,7 @@ def get_model(model_name, params=None):
     else:
         raise NotImplementedError(
             f"Model `{model_name}` not implemented. "
-            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'maxrm_mse', 'maxrm_regret'"
+            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'maxrm-mse', 'maxrm-regret'"
         )
 
 
@@ -136,6 +136,9 @@ def get_random_params(model_name, n_iter=10, setting=None, target=None):
     if model_name in ['lr', 'constant']:
         return [{}]
 
+    if model_name == 'maxrm-mse':
+        n_iter = 1
+
     best_mlp = None
     if model_name in ['gdro', 'coral', 'mmd']:
         if setting is not None and target is not None:
@@ -160,11 +163,12 @@ def get_random_params(model_name, n_iter=10, setting=None, target=None):
                 'epsilon': float(np_rng.uniform(1.1, 2.0))
             }
 
-        elif model_name in ['maxrm_mse', 'maxrm_regret']:
+        elif model_name in ['maxrm-mse', 'maxrm-regret']:
             params = {
-                'n_estimators': rng.choice([100, 200, 500, 1000]),
-                'min_samples_leaf': rng.randint(5, 50),
-                'random_state': 42,
+                'n_estimators': 100, #100, 
+                'min_samples_leaf': 20, #rng.randint(20, 200),
+                'seed': 42,
+                'sampling_args': {'size': 0.2}, #float(np_rng.uniform(0.1, 0.3))},
             }
 
         elif model_name in ['xgb', 'xgb_conservative']:
