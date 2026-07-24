@@ -256,6 +256,10 @@ def get_data_split(
 # consumes fixed-length windows of the hourly series. The helpers below build
 # those windows *within* each (site, split) block so a window never crosses a
 # site boundary (nor, for the temporal setting, a train/val/test year boundary).
+#
+# Any seq2seq net can reuse these helpers, but the eval tiling is causal: each
+# step gets `warmup` steps of past context only, so bidirectional/attention
+# models would need different windowing.
 
 # Non-target / non-covariate columns that must never be fed to the model.
 _NON_FEATURE_COLS = ['time', 'site_id', 'year', 'qc_mask',
@@ -280,20 +284,28 @@ def _train_window_starts(length, window, stride):
     return starts
 
 
-def _eval_window_specs(length, window, warmup):
+def _eval_window_specs(length, window, warmup, cover_warmup=False):
     """Non-overlapping *coverage* of one site block for evaluation.
 
     Each returned (start, own_lo, own_hi) window emits predictions only for the
     slice [own_lo:own_hi] (window-local coords); the leading `warmup` steps of
     every window are context that spins up the hidden state. Consecutive windows
-    are placed so their emitted slices tile [warmup, length) exactly once, giving
-    every test step one prediction with a full warmup of preceding context. The
-    first `warmup` steps of each site block are intentionally left unpredicted.
+    are placed so their emitted slices tile the covered region exactly once.
+
+    By default coverage is [warmup, length): every predicted step gets a full
+    warmup of preceding context, and the first `warmup` steps are left
+    unpredicted. With cover_warmup=True, coverage is [0, length) instead -- the
+    first window emits from step 0, so the earliest steps are predicted with less
+    than a full warmup of context. This is used to score the test set on EVERY
+    row (matching the flat baselines), where a handful of low-context predictions
+    at each site's start is preferable to leaving those rows unscored.
     """
     specs = []
-    if length <= warmup:
+    if length == 0:
+        return specs
+    if not cover_warmup and length <= warmup:
         return specs  # too short to emit anything after warmup
-    owned = warmup  # next absolute timestep still needing a prediction
+    owned = 0 if cover_warmup else warmup  # next absolute step needing a prediction
     while owned < length:
         start = max(0, owned - warmup)
         end = min(start + window, length)
@@ -305,21 +317,31 @@ def _eval_window_specs(length, window, warmup):
 def _build_site_blocks(split_df, feature_cols, target, scaler):
     """Turn one split's dataframe into per-site, time-ordered arrays.
 
-    Returns a list of dicts (one per site) with standardized features, the
-    target (NaN wherever qc_mask is False, i.e. not a measured value), a boolean
-    validity mask, timestamps and the site id. Sites are ordered deterministically.
+    Returns a list of dicts (one per site) with standardized features, two target
+    arrays, a boolean validity mask, timestamps and the site id. Sites are ordered
+    deterministically.
+
+    Two targets are kept:
+      * 'target'      -- NaN wherever qc_mask is False (not a measured value). Used
+                         for the training loss so the model never learns from
+                         gap-filled (imputed) values.
+      * 'target_eval' -- the raw target column, keeping the gap-filled value at
+                         qc_mask == 0 steps. Used to score the test set on EVERY
+                         row, exactly like the flat baselines (see _build_eval).
     """
     blocks = []
     for site_id, g in split_df.groupby('site_id', sort=True):
         g = g.sort_values('time')
         feats = scaler.transform(g[feature_cols].values).astype(np.float32)
         valid = g['qc_mask'].values.astype(bool)   # True == measured target
-        tgt = g[target].values.astype(np.float32).copy()
-        tgt[~valid] = np.nan                        # never impute the target
+        tgt_eval = g[target].values.astype(np.float32).copy()  # keeps gap-filled
+        tgt = tgt_eval.copy()
+        tgt[~valid] = np.nan                        # never impute the training target
         blocks.append({
             'site_id': site_id,
             'feats': feats,
             'target': tgt,
+            'target_eval': tgt_eval,
             'valid': valid,
             'time': g['time'].values,
             'year': g['year'].values,
@@ -340,13 +362,24 @@ def get_sequence_split(df, setting, path, target="GPP", validation_split='defaul
         val   = (Xval,   yval,   envs_val)
         test  = (Xtest,  ytest,  envs_test, sites_test, times_test)
     Here each X* is a dict of windows/blocks consumed by models.lstm.LSTMRegressor,
-    while y*/envs*/sites*/times* are flat, valid-only arrays aligned to the model's
-    per-timestep predictions (exactly the rows the flat baselines would score on,
-    minus the first `warmup` steps of each block).
+    while y*/envs*/sites*/times* are flat arrays aligned to the model's
+    per-timestep predictions.
+
+    Scored rows match the flat path. The test set is scored on EVERY row --
+    gap-filled (qc_mask == 0) targets and the first `warmup` steps included --
+    so per-site RMSE is directly comparable to the flat baselines. As with the
+    flat baselines, the TRAINING loss and the validation set used for model
+    selection stay measured-only (qc_mask == 1), so the model never learns from
+    (or is tuned on) imputed values; only the reported test metric spans all rows.
+    See _build_eval and _build_site_blocks.
     """
     if validation_split != 'default':
         raise NotImplementedError(
             "Sequence (LSTM) split only supports validation_split='default'")
+    if window <= warmup:
+        # eval-window tiling can't advance when window <= warmup (infinite loop).
+        raise ValueError(
+            f"window ({window}) must be strictly greater than warmup ({warmup})")
 
     df = df.copy()
     if setting == "time-split":
@@ -371,9 +404,13 @@ def get_sequence_split(df, setting, path, target="GPP", validation_split='defaul
 
     feature_cols = [c for c in df.columns if c not in _NON_FEATURE_COLS]
 
-    # RobustScaler fit on training covariates only (inputs are complete, so this
-    # matches the flat baselines' standardize=True behaviour).
-    scaler = RobustScaler().fit(train_df[feature_cols].values)
+    # RobustScaler fit on training covariates only. To match the flat baselines
+    # exactly, fit on measured (qc_mask == 1) rows: the flat path drops
+    # gap-filled-target rows via remove_missing_target BEFORE fitting the scaler,
+    # so its median/IQR come from measured steps only. Features are complete
+    # regardless of qc_mask, so this is purely about which rows define the stats.
+    train_measured = train_df.loc[train_df['qc_mask'].astype(bool)]
+    scaler = RobustScaler().fit(train_measured[feature_cols].values)
 
     train_blocks = _build_site_blocks(train_df, feature_cols, target, scaler)
     val_blocks = _build_site_blocks(val_df, feature_cols, target, scaler)
@@ -394,19 +431,34 @@ def get_sequence_split(df, setting, path, target="GPP", validation_split='defaul
     Xtrain = {**common, 'blocks': train_blocks, 'window_index': train_index,
               'train_stride': train_stride}
 
-    def _build_eval(blocks):
-        """Eval X-dict + flat, valid-only metadata aligned to predictions."""
+    def _build_eval(blocks, score_all=False):
+        """Eval X-dict + flat metadata aligned to predictions.
+
+        score_all=False (validation, model selection): scores only measured
+        (qc_mask == 1) steps at t >= warmup -- the same rows the training loss
+        sees, so hyperparameter selection is measured-only.
+
+        score_all=True (test): scores EVERY step against 'target_eval', including
+        gap-filled (qc_mask == 0) targets and the first `warmup` steps. This
+        matches the flat baselines, whose test set keeps every row (only
+        train/val drop gap-filled targets via remove_missing_target).
+        """
         flat_index, flat_y, flat_env, flat_site, flat_time = [], [], [], [], []
         eval_windows = []
         for si, b in enumerate(blocks):
             length = b['feats'].shape[0]
-            for (start, own_lo, own_hi) in _eval_window_specs(length, window, warmup):
+            for (start, own_lo, own_hi) in _eval_window_specs(
+                    length, window, warmup, cover_warmup=score_all):
                 eval_windows.append((si, start, own_lo, own_hi))
-            # Flat rows: every covered (t >= warmup) step with a measured target.
-            for t in range(warmup, length):
-                if b['valid'][t]:
+            tgt = b['target_eval'] if score_all else b['target']
+            first_t = 0 if score_all else warmup
+            for t in range(first_t, length):
+                # score_all: every step with a (measured or gap-filled) target;
+                # otherwise: only measured (qc_mask == 1) steps.
+                keep = not np.isnan(tgt[t]) if score_all else b['valid'][t]
+                if keep:
                     flat_index.append((si, t))
-                    flat_y.append(b['target'][t])
+                    flat_y.append(tgt[t])
                     flat_site.append(b['site_id'])
                     flat_time.append(b['time'][t])
                     flat_env.append((b['site_id'], int(b['year'][t]))
@@ -416,15 +468,24 @@ def get_sequence_split(df, setting, path, target="GPP", validation_split='defaul
         y = np.asarray(flat_y, dtype=np.float32)
         return X, y, pd.Series(flat_env), pd.Series(flat_site), pd.Series(flat_time)
 
-    Xval, yval, envs_val, _, _ = _build_eval(val_blocks)
-    Xtest, ytest, envs_test, sites_test, times_test = _build_eval(test_blocks)
+    Xval, yval, envs_val, _, _ = _build_eval(val_blocks, score_all=False)
+    Xtest, ytest, envs_test, sites_test, times_test = _build_eval(
+        test_blocks, score_all=True)
 
     # ytrain is unused by the LSTM (targets live inside the windows) but returned
     # for signature parity with get_data_split.
     ytrain = np.concatenate([b['target'][b['valid']] for b in train_blocks]) \
         if train_blocks else np.empty(0, dtype=np.float32)
-    envs_train = pd.Series(
-        [b['site_id'] for b in train_blocks for _ in range(int(b['valid'].sum()))])
+    # env matches the flat path: (site_id, year) for time-split, else site_id.
+    # Aligned to ytrain (same per-block, valid-timestep order).
+    if env_is_site_year:
+        envs_train = pd.Series(
+            [(b['site_id'], int(y))
+             for b in train_blocks for y in b['year'][b['valid']]])
+    else:
+        envs_train = pd.Series(
+            [b['site_id']
+             for b in train_blocks for _ in range(int(b['valid'].sum()))])
 
     logger.info(
         f"[sequence] {setting}/{target}: train windows={len(train_index)}, "

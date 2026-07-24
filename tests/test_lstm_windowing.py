@@ -48,6 +48,27 @@ def test_eval_windows_tile_exactly_once():
     print("ok  test_eval_windows_tile_exactly_once")
 
 
+def test_eval_windows_cover_warmup():
+    # cover_warmup=True: coverage is [0, length) -- every step scored once,
+    # including the leading warmup region (test set matches the flat baselines).
+    length, window, warmup = 2000, 720, 168
+    specs = _eval_window_specs(length, window, warmup, cover_warmup=True)
+    covered = np.zeros(length, dtype=int)
+    for (start, own_lo, own_hi) in specs:
+        assert start >= 0 and start + own_hi <= length      # stays in the block
+        covered[start + own_lo:start + own_hi] += 1
+    assert (covered == 1).all(), "every step must be covered exactly once"
+    # A block shorter than warmup still emits a single window covering it all.
+    short = _eval_window_specs(warmup, window, warmup, cover_warmup=True)
+    covered_short = np.zeros(warmup, dtype=int)
+    for (start, own_lo, own_hi) in short:
+        covered_short[start + own_lo:start + own_hi] += 1
+    assert (covered_short == 1).all(), "short block must be fully covered"
+    # An empty block emits nothing regardless.
+    assert _eval_window_specs(0, window, warmup, cover_warmup=True) == []
+    print("ok  test_eval_windows_cover_warmup")
+
+
 def test_loss_mask_ignores_warmup_and_missing():
     window, warmup = 10, 3
     length = 10
@@ -90,6 +111,7 @@ def test_short_block_padding_mask():
 if __name__ == "__main__":
     test_train_window_starts()
     test_eval_windows_tile_exactly_once()
+    test_eval_windows_cover_warmup()
     test_loss_mask_ignores_warmup_and_missing()
     test_short_block_padding_mask()
     print("\nAll LSTM windowing/masking tests passed.")

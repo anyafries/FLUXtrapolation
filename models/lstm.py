@@ -14,9 +14,12 @@ The model predicts the target at every timestep of a fixed-length window
     is missing (qc_mask == 0). We never impute the target. The dataloader
     supplies windows with a boolean mask encoding both conditions.
 
-  * Eval coverage. At prediction time the dataloader tiles each site with
-    overlapping windows so every test step gets exactly one prediction with a
-    full warmup of preceding context (see dataloader._eval_window_specs).
+  * Eval coverage. At prediction time the dataloader tiles each site so every
+    test step gets exactly one prediction. Training loss and validation stay
+    measured-only, but the TEST set is scored on every row -- gap-filled targets
+    and the first `warmup` steps included -- to match the flat baselines (see
+    dataloader._eval_window_specs and _build_eval). The earliest steps of each
+    site are predicted with less than a full warmup of context.
 
 The X passed to fit/predict is NOT a plain tensor: it is the dict of per-site
 blocks + window indices produced by dataloader.get_sequence_split.
