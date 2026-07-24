@@ -53,6 +53,12 @@ def get_params_path(setting, target, model_name, val_strategy):
     return os.path.join(RESULTS_DIR, 'models', f"{exp_name}_best_params.json")
 
 
+def get_model_path(setting, target, model_name, val_strategy):
+    """Get path for a saved (fitted) model checkpoint."""
+    exp_name = get_exp_name(setting, target, model_name, val_strategy)
+    return os.path.join(RESULTS_DIR, 'models', f"{exp_name}_model.pt")
+
+
 # ----------- Generic I/O functions -----------
 
 def save_csv(df, path):

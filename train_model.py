@@ -1,16 +1,22 @@
 import argparse
 import os
 import pandas as pd
+import torch
 
 from sklearn.metrics import root_mean_squared_error
 
 from dataloader import load_data, get_data_split, save_predictions
 from models import get_model, get_random_params
 from tests.test_models import test_model
-from utils.eval_utils import compute_and_save_metrics, save_best_params
+from utils.eval_utils import compute_and_save_metrics, save_best_params, save_model
 from utils.utils import setup_logging, get_metrics_path
 
 logger = setup_logging(__name__)
+
+# Safe, no-crash determinism knobs (near no-ops for the Linear-only nets, but
+# harmless). Reproducibility of the deep models comes primarily from saved weights.
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 ALL_SETTINGS = ['time-split', 'spatial-easy40', 'TA40']
 ALL_TARGETS = ['ET', 'GPP', 'NEE']
@@ -71,7 +77,7 @@ if __name__ == "__main__":
 
             # Hyperparameter tuning loop
             logger.info(f"Starting random search for {model_name} on {setting}-{target}...")
-            param_grid = get_random_params(model_name, setting=setting, target=target)
+            param_grid = get_random_params(model_name)
             best = {s: {'score': float('inf'), 'params': None, 'model': None}
                     for s in ['mean', 'max', 'discrepancy']}
             
@@ -130,7 +136,11 @@ if __name__ == "__main__":
             logger.info(f"Saving predictions and metrics for {setting}/{target}/{model_name}...")
             for strategy, b in best.items():
                 logger.info(f"  [{strategy}] Best val score: {b['score']:.4f}, params: {b['params']}")
-                save_best_params(b['params'], setting, target, model_name, val_strategy=strategy)
+                save_best_params(b['params'], setting, target, model_name,
+                                 val_strategy=strategy, val_score=b['score'])
+                if model_name in DEEP_MODELS:
+                    save_model(b['model'], b['params'], len(feature_cols),
+                               setting, target, model_name, val_strategy=strategy)
                 ypred = b['model'].predict(xtest)
                 preds_df = save_predictions(test, ypred, setting, target, model_name, val_strategy=strategy)
                 compute_and_save_metrics(preds_df, setting, target, model_name, val_strategy=strategy)

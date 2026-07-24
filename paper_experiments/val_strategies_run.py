@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
                 # Hyperparameter tuning loop
                 logger.info(f"Starting random search for {model_name} on {setting}-{target}...")
-                param_grid = get_random_params(model_name, setting=setting, target=target)
+                param_grid = get_random_params(model_name)
                 best = {s: {'score': float('inf'), 'params': None, 'model': None}
                         for s in ['mean', 'max', 'discrepancy']}
                 
@@ -130,7 +130,8 @@ if __name__ == "__main__":
                 logger.info(f"Saving predictions and metrics for {save_setting_name}/{target}/{model_name}...")
                 for strategy, b in best.items():
                     logger.info(f"  [{strategy}] Best val score: {b['score']:.4f}")
-                    save_best_params(b['params'], save_setting_name, target, model_name, val_strategy=strategy)
+                    save_best_params(b['params'], save_setting_name, target, model_name,
+                                     val_strategy=strategy, val_score=b['score'])
                     ypred = b['model'].predict(xtest)
                     preds_df = save_predictions(test, ypred, save_setting_name, target, model_name, val_strategy=strategy)
                     compute_and_save_metrics(preds_df, save_setting_name, target, model_name, val_strategy=strategy)
