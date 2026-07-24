@@ -71,7 +71,9 @@ def modify_predictions(
     # Forward verbose into modify_predictions_trees so its own
     # "Initial score / Optimized score / rolling back" diagnostics print,
     # not just this wrapper's solver-attempt lines.
-    kwargs = {"method": risk, "n_jobs": n_jobs, "verbose": verbose}
+    kwargs = {"method": risk, "n_jobs": n_jobs, "verbose": verbose,
+              "bcd": True, "block_size": 15}
+
     if risk == "regret":
         kwargs["sols_erm"] = sols_erm
         kwargs["sols_erm_trees"] = sols_erm_trees
@@ -123,7 +125,7 @@ class MaxRM_RF(RandomForest):
     """
 
     def __init__(self, n_estimators=100, seed=42,
-                 min_samples_leaf=30, n_jobs=2, risk='mse',
+                 min_samples_leaf=30, n_jobs=1, risk='mse',
                  max_depth=None, sampling_args=None):
         params = {
             'n_estimators': n_estimators,
