@@ -94,6 +94,7 @@ Training performs random hyperparameter search and selects the best model under 
 | `lightgbm` | LightGBM | `pip install lightgbm` |
 | `constant` | Dummy mean predictor | — |
 | `mlp` | Multi-layer Perceptron (PyTorch) | — |
+| `lstm` | Seq2seq LSTM baseline over the hourly series (PyTorch) | — |
 | `gdro` | Group DRO — minimizes worst-group loss (PyTorch) | — |
 | `coral` | CORAL domain generalization (PyTorch) | — |
 | `mmd` | MMD domain generalization (PyTorch) | — |
@@ -189,11 +190,11 @@ Return `[{}]` if your model has no hyperparameters.
 
 ### Step 4 — (PyTorch only) Update `train_model.py`
 
-If your model requires `torch.Tensor` inputs, add its name to the two lists on lines 62–63 of [train_model.py](train_model.py):
+If your model requires `torch.Tensor` inputs, add its name to the `STANDARDIZE_MODELS` and `ASTORCH_MODELS` lists near the top of [train_model.py](train_model.py):
 
 ```python
-standardize=model_name in ['robust-lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'my-model'],
-astorch=model_name in ['mlp', 'gdro', 'coral', 'mmd', 'my-model']
+STANDARDIZE_MODELS = ['robust-lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'my-model']
+ASTORCH_MODELS = ['mlp', 'gdro', 'coral', 'mmd', 'my-model']
 ```
 
 Skip this step if your model works with numpy arrays.
@@ -203,6 +204,27 @@ Skip this step if your model works with numpy arrays.
 ```bash
 python train_model.py --model_name my-model --setting time-split --target GPP
 ```
+
+### Extra `get_data_split` options
+
+`train_model.py` calls `get_data_split` (in [dataloader.py](dataloader.py)) with a fixed set of options, but the function accepts several more that are **not exposed as CLI flags**. Change them in code if you need them:
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `keep_time` | `False` | Keep the `time` column (otherwise dropped before modelling). Always retained internally for the test-set metadata regardless of this flag. |
+| `keep_lonlat` | `False` | Keep `tower_lat` / `tower_lon` as features instead of dropping them. |
+| `validation_split` | `'default'` | How train/val are carved from the non-test sites: `default` (fixed validation-site list), `iid` (stratified random split), `temporal` (year 2022 held out as val), `oracle` (10% of the test sites). |
+| `remove_missing_target` | `False` | Drop rows whose target is gap-filled (`qc_mask == 0`) rather than keeping them as NaN. |
+| `standardize` / `astorch` | `False` | Apply a train-fit `RobustScaler` / return `torch.Tensor`s. Driven by the `STANDARDIZE_MODELS` / `ASTORCH_MODELS` lists in `train_model.py`. |
+
+**Sequence mode (LSTM).** Setting `sequence=True` returns time-ordered windows of the hourly series instead of flattened rows (used automatically for `--model_name lstm`). It enables three more windowing knobs, in hourly steps:
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `window` | `720` | Window length (30 days). |
+| `warmup` | `168` | Leading steps per window that only warm the LSTM's hidden state — excluded from the training loss and left unpredicted at eval (7 days). |
+| `train_stride` | `168` | Stride between overlapping training windows (7 days). Eval windows are instead tiled so every post-warmup step is predicted exactly once. |
+
 
 ---
 
