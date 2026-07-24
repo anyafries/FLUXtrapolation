@@ -20,7 +20,7 @@ torch.backends.cudnn.benchmark = False
 
 ALL_SETTINGS = ['time-split', 'spatial-easy40', 'TA40']
 ALL_TARGETS = ['ET', 'GPP', 'NEE']
-DEEP_MODELS = ['mlp', 'gdro', 'coral', 'mmd']
+DEEP_MODELS = ['mlp', 'gdro', 'coral', 'mmd', 'mmd-median']
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -66,8 +66,8 @@ if __name__ == "__main__":
                 target=target,
                 remove_missing_target=True,
                 path=args.path,
-                standardize=model_name in ['robust-lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd'],
-                astorch=model_name in ['mlp', 'gdro', 'coral', 'mmd'],
+                standardize=model_name in ['robust-lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'mmd-median'],
+                astorch=model_name in ['mlp', 'gdro', 'coral', 'mmd', 'mmd-median'],
                 return_colnames=True,
             )
             train, val, test, feature_cols, _ = split

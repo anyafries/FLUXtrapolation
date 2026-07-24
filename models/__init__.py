@@ -9,7 +9,8 @@ Available models:
   - 'mlp'           : Multi-layer Perceptron
   - 'gdro'          : Group DRO (worst-group loss minimization)
   - 'coral'         : CORAL domain adaptation
-  - 'mmd'           : MMD domain adaptation
+  - 'mmd'           : MMD domain adaptation (fixed multi-scale kernel bandwidths)
+  - 'mmd-median'    : MMD domain adaptation (median-heuristic kernel bandwidth)
   - 'maxrm_mse'     : MaxRM Random Forest with MSE risk
   - 'maxrm_regret'  : MaxRM Random Forest with regret risk
 """
@@ -84,7 +85,11 @@ def get_model(model_name, params=None):
     elif model_name == 'mmd':
         from .coral import MMD
         return MMD(**params)
-    
+
+    elif model_name == 'mmd-median':
+        from .coral import MMD
+        return MMD(bandwidth_mode="median", **params)
+
     elif model_name == 'maxrm-mse':
         from .maxrm_rf import MaxRM_RF
         return MaxRM_RF(risk='mse', **params)
@@ -96,7 +101,7 @@ def get_model(model_name, params=None):
     else:
         raise NotImplementedError(
             f"Model `{model_name}` not implemented. "
-            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'maxrm_mse', 'maxrm_regret'"
+            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'mmd-median', 'maxrm_mse', 'maxrm_regret'"
         )
 
 
@@ -177,7 +182,7 @@ def get_random_params(model_name, n_iter=10):
                 'boosting_type': 'goss',
             }
 
-        elif model_name in ['mlp', 'gdro', 'coral', 'mmd']:
+        elif model_name in ['mlp', 'gdro', 'coral', 'mmd', 'mmd-median']:
             # Base deep learning params
             params = {
                 'hidden_dims': rng.choice([[128, 64], [256, 128], [512, 256, 128]]),
@@ -192,7 +197,10 @@ def get_random_params(model_name, n_iter=10):
                 params['group_weight_step'] = sample_log_uniform(1e-4, 1e-1, np_rng)
             elif model_name == 'coral':
                 params['coral_lambda'] = sample_log_uniform(1e-2, 1e1, np_rng)
-            elif model_name == 'mmd':
+            elif model_name in ['mmd', 'mmd-median']:
+                # Same lambda search for both; mmd-median differs only in how the
+                # kernel bandwidth is chosen (set in get_model), which is NOT a
+                # tuned hyperparameter.
                 params['mmd_lambda'] = sample_log_uniform(1e-2, 1e1, np_rng)
 
         random_configs.append(params)

@@ -207,17 +207,55 @@ class MMD(_AbstractDomainAlignment):
     encouraging domain-invariant feature representations.
 
     Adapted from https://github.com/mlfoundations/tableshift
+
+    The Gaussian kernel bandwidths are chosen one of two ways (`bandwidth_mode`):
+      - "fixed"  : the TableShift/DomainBed multi-scale grid
+                   {1e-3, 1e-2, 1e-1, 1, 10, 100, 1000} (default).
+      - "median" : data-driven via the median heuristic. Each forward pass the
+                   median squared pairwise distance of the pooled batch
+                   representations sets a base length-scale; it is smoothed
+                   across batches with an EMA (stored in a registered buffer)
+                   and a multi-kernel set is centered on it. Only the choice of
+                   bandwidths differs from "fixed"; the penalty, architecture,
+                   training loop and lambda search are identical.
     """
+
+    # Multi-kernel multipliers centered on the median length-scale (symmetric
+    # about 1, matching the multi-scale structure of the fixed grid).
+    _MEDIAN_MULTS = (0.25, 0.5, 1.0, 2.0, 4.0)
+    _N_MED = 512            # cap on rows used for the median estimate
+    _EMA_MOMENTUM = 0.9     # EMA smoothing of the batch median
+    _SIGMA_SQ_FLOOR = 1e-8  # floor to avoid divide-by-zero
 
     def __init__(self, hidden_dims=[128, 64], dropout=0.1, lr=1e-3,
                  n_epochs=500, batch_size=1024, early_stopping_rounds=10,
-                 mmd_lambda=1.0, num_mmd_pairs=5):
+                 mmd_lambda=1.0, num_mmd_pairs=5, bandwidth_mode="fixed"):
         super().__init__(hidden_dims=hidden_dims, dropout=dropout, lr=lr,
                          n_epochs=n_epochs, batch_size=batch_size,
                          early_stopping_rounds=early_stopping_rounds)
+        if bandwidth_mode not in ("fixed", "median"):
+            raise ValueError(
+                f"bandwidth_mode must be 'fixed' or 'median', got {bandwidth_mode!r}"
+            )
         self.mmd_lambda = mmd_lambda
         self.num_mmd_pairs = num_mmd_pairs
         self._n_pairs = num_mmd_pairs
+        self.bandwidth_mode = bandwidth_mode
+        # Recorded for verification (median mode only); reset per fit.
+        self.sigma_sq_ema_history = []
+        self._sigma_initialized = False
+
+    def _build_model(self, input_dim):
+        super()._build_model(input_dim)
+        # Register the EMA bandwidth as a buffer (not a parameter) so it is
+        # saved/restored with the feature extractor and available at eval time.
+        # Registered eagerly (before the first batch) so state_dict keys are
+        # consistent for early-stopping restore and any later strict load.
+        self.sigma_sq_ema_history = []
+        self._sigma_initialized = False
+        if self.bandwidth_mode == "median":
+            self.feature_extractor.register_buffer(
+                "mmd_sigma_sq_ema", torch.ones((), device=self.device))
 
     def _my_cdist(self, x1, x2):
         # Copied from https://github.com/mlfoundations/tableshift
@@ -234,7 +272,47 @@ class MMD(_AbstractDomainAlignment):
             K.add_(torch.exp(D.mul(-g)))
         return K
 
+    def _median_gammas(self, feats):
+        """
+        Data-driven kernel gammas via the median heuristic.
+
+        Computes the median squared pairwise L2 distance on the pooled batch
+        representations (all domains together, capped at ``_N_MED`` rows for
+        cost), smooths it across batches with an EMA buffer, and returns the
+        multi-kernel set of gammas centered on the median.
+
+        The bandwidth is a CONSTANT w.r.t. autograd: the distances, median and
+        EMA update all run under ``torch.no_grad()`` and the returned gammas are
+        plain Python floats, so no gradient flows through the bandwidth.
+        """
+        with torch.no_grad():
+            z = feats.detach()
+            n = z.shape[0]
+            if n > self._N_MED:
+                idx = torch.randperm(n, device=z.device)[:self._N_MED]
+                z = z[idx]
+            m = z.shape[0]
+            ema = self.feature_extractor.mmd_sigma_sq_ema
+            if m > 1:
+                D = self._my_cdist(z, z)
+                off_diag = D[~torch.eye(m, dtype=torch.bool, device=z.device)]
+                sigma_sq_batch = off_diag.median().clamp_min(self._SIGMA_SQ_FLOOR)
+                if not self._sigma_initialized:
+                    ema.fill_(float(sigma_sq_batch))
+                    self._sigma_initialized = True
+                else:
+                    ema.mul_(self._EMA_MOMENTUM).add_(
+                        sigma_sq_batch, alpha=1.0 - self._EMA_MOMENTUM)
+                ema.clamp_min_(self._SIGMA_SQ_FLOOR)
+            sigma_sq = float(ema)
+        self.sigma_sq_ema_history.append(sigma_sq)
+        return [mult / sigma_sq for mult in self._MEDIAN_MULTS]
+
     def _compute_penalty(self, feats, env_batch, subset_envs):
+        if self.bandwidth_mode == "median":
+            gamma = self._median_gammas(feats)
+        else:
+            gamma = [0.001, 0.01, 0.1, 1, 10, 100, 1000]
         env_feats = [
             feats[env_batch == e]
             for e in subset_envs
@@ -244,9 +322,9 @@ class MMD(_AbstractDomainAlignment):
         n_pairs = 0
         for i in range(len(env_feats)):
             for j in range(i + 1, len(env_feats)):
-                Kxx = self._gaussian_kernel(env_feats[i], env_feats[i]).mean()
-                Kyy = self._gaussian_kernel(env_feats[j], env_feats[j]).mean()
-                Kxy = self._gaussian_kernel(env_feats[i], env_feats[j]).mean()
+                Kxx = self._gaussian_kernel(env_feats[i], env_feats[i], gamma=gamma).mean()
+                Kyy = self._gaussian_kernel(env_feats[j], env_feats[j], gamma=gamma).mean()
+                Kxy = self._gaussian_kernel(env_feats[i], env_feats[j], gamma=gamma).mean()
                 penalty += Kxx + Kyy - 2 * Kxy
                 n_pairs += 1
         if n_pairs > 0:
