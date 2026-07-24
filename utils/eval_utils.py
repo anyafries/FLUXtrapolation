@@ -12,10 +12,11 @@ import os
 
 from utils.aggregation import AGGREGATIONS
 from utils.utils import (
-    setup_logging, 
-    get_metrics_path, 
-    get_params_path, 
-    save_csv, 
+    setup_logging,
+    get_metrics_path,
+    get_params_path,
+    get_model_path,
+    save_csv,
     load_csv
 )
 
@@ -130,15 +131,35 @@ def load_metrics(setting, target, model_name, val_strategy):
     return load_csv(metrics_path)
 
 
-def save_best_params(best_params, setting, target, model_name, val_strategy):
-    """Save the best hyperparameter dictionary to a JSON file."""
+def save_best_params(best_params, setting, target, model_name, val_strategy,
+                     val_score=None):
+    """Save the best hyperparameter dictionary (and its validation score) to JSON."""
     path = get_params_path(setting, target, model_name, val_strategy)
     # Ensure the directory exists (in case it's the first file being saved)
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     with open(path, 'w') as f:
-        json.dump(best_params, f, indent=4)
+        json.dump({'params': best_params, 'val_score': val_score}, f, indent=4)
     logger.info(f"Saved best parameters to {path}")
+
+
+def save_model(model, params, input_dim, setting, target, model_name, val_strategy):
+    """
+    Save a fitted deep-learning model's weights for later reuse.
+
+    Stores each nn.Module submodule's state_dict plus the params and input_dim
+    needed to rebuild the architecture (see get_model). Only meaningful for the
+    torch-based models (mlp, gdro, coral, mmd).
+    """
+    import torch
+
+    path = get_model_path(setting, target, model_name, val_strategy)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    state = {name: module.state_dict()
+             for name, module in vars(model).items()
+             if isinstance(module, torch.nn.Module)}
+    torch.save({'params': params, 'input_dim': input_dim, 'state': state}, path)
+    logger.info(f"Saved model weights to {path}")
 
 
 # -----------------------------------------------------------------------
