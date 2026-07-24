@@ -20,7 +20,10 @@ torch.backends.cudnn.benchmark = False
 
 ALL_SETTINGS = ['time-split', 'spatial-easy40', 'TA40']
 ALL_TARGETS = ['ET', 'GPP', 'NEE']
-DEEP_MODELS = ['mlp', 'gdro', 'coral', 'mmd', 'mmd-median']
+
+DEEP_MODELS = ['mlp', 'gdro', 'coral', 'mmd', 'mmd-median', 'lstm']
+STANDARDIZE_MODELS = ['robust-lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'mmd-median']
+ASTORCH_MODELS = ['mlp', 'gdro', 'coral', 'mmd', 'mmd-median']
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -34,7 +37,7 @@ if __name__ == "__main__":
     parser.add_argument("--target", type=str, 
                         choices=['GPP', 'NEE', 'ET', 'all'],
                         default='all', help="Target variable to predict")
-    parser.add_argument("--model_name", type=str, 
+    parser.add_argument("--model_name", type=str,
                         default='lr', help="Model to use for the experiment")
 
     args = parser.parse_args()
@@ -66,9 +69,10 @@ if __name__ == "__main__":
                 target=target,
                 remove_missing_target=True,
                 path=args.path,
-                standardize=model_name in ['robust-lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'mmd-median'],
-                astorch=model_name in ['mlp', 'gdro', 'coral', 'mmd', 'mmd-median'],
+                standardize=model_name in STANDARDIZE_MODELS,
+                astorch=model_name in ASTORCH_MODELS,
                 return_colnames=True,
+                sequence=model_name == 'lstm',
             )
             train, val, test, feature_cols, _ = split
             xtrain, ytrain, envs_train = train
