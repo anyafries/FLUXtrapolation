@@ -14,6 +14,7 @@ logger = setup_logging(__name__)
 
 ALL_SETTINGS = ['time-split', 'spatial-easy40', 'TA40']
 ALL_TARGETS = ['ET', 'GPP', 'NEE']
+DEEP_MODELS = ['mlp', 'gdro', 'coral', 'mmd', 'mmd-median']
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -53,15 +54,17 @@ if __name__ == "__main__":
                 logger.info(f"Results for {setting}/{target}/{model_name} already exist. Use --rerun to rerun.")
                 continue
 
-            train, val, test = get_data_split(
+            split = get_data_split(
                 df,
                 setting,
                 target=target,
                 remove_missing_target=True,
                 path=args.path,
-                standardize=model_name in ['robust-lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd'],
-                astorch = model_name in ['mlp', 'gdro', 'coral', 'mmd']
+                standardize=model_name in ['robust-lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'mmd-median'],
+                astorch=model_name in ['mlp', 'gdro', 'coral', 'mmd', 'mmd-median'],
+                return_colnames=True,
             )
+            train, val, test, feature_cols, _ = split
             xtrain, ytrain, envs_train = train
             xval, yval, envs_val = val
             xtest = test[0]
@@ -75,7 +78,7 @@ if __name__ == "__main__":
             for i, params in enumerate(param_grid):
                 # Get model and train
                 model = get_model(model_name, params)
-                use_eval_set, use_envs = test_model(model)
+                use_eval_set, use_envs, use_feature_names = test_model(model)
 
                 # Build fit arguments dynamically
                 fit_args = {'X': xtrain, 'y': ytrain}
@@ -83,8 +86,10 @@ if __name__ == "__main__":
                     fit_args['eval_set'] = [(xval, yval)]
                 if use_envs:
                     fit_args['envs'] = envs_train.values
-                if model_name == 'xgb':
+                if model_name in ['xgb', 'xgb_conservative']:
                     fit_args['verbose'] = False
+                if use_feature_names:
+                    fit_args['feature_names'] = feature_cols
                 if model_name == 'lightgbm':
                     import lightgbm as lgb
                     fit_args['eval_metric'] = 'rmse'
