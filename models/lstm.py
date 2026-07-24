@@ -3,8 +3,7 @@ Sequence-to-sequence LSTM baseline with a sklearn-style fit/predict API.
 
 A small, config-driven LSTM for the hourly FLUXNET upscaling benchmark, added
 as a modern sequential counterpart to the (non-sequential) baselines. Motivated
-by Kraft et al. (2025), "On the added value of sequential deep learning for the
-upscaling of evapotranspiration."
+by [reference removed temporarily for double-blind review].
 
 The model predicts the target at every timestep of a fixed-length window
 (seq2seq). Two subtleties, handled here and in dataloader.get_sequence_split:
