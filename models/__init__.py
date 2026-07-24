@@ -14,12 +14,10 @@ Available models:
   - 'maxrm_regret'  : MaxRM Random Forest with regret risk
 """
 
-import json
 import numpy as np
-import os
 import random
 
-from utils.utils import setup_logging, get_params_path
+from utils.utils import setup_logging
 
 logger = setup_logging(__name__)
 
@@ -111,39 +109,19 @@ def sample_log_uniform(low, high, rng):
     return float(10 ** rng.uniform(np.log10(low), np.log10(high)))
 
 
-def load_best_mlp_params(setting, target, val_strategy):
-    """Helper to fetch the best MLP parameters already saved."""
-    path = get_params_path(setting, target, 'mlp', val_strategy)
-    if os.path.exists(path):
-        with open(path, 'r') as f:
-            return json.load(f)
-    return None
-
-
-def get_random_params(model_name, n_iter=10, setting=None, target=None):
+def get_random_params(model_name, n_iter=10):
     """
     Generates N random parameter sets for a given model.
     
     Args:
         model_name (str): The model identifier.
         n_iter (int): Number of random configurations to generate.
-        setting (str): Current setting (used for inheriting MLP params).
-        target (str): Current target (used for inheriting MLP params).
     """
     np_rng = np.random.default_rng(42)
     rng = random.Random(42)
 
     if model_name in ['lr', 'constant']:
         return [{}]
-
-    best_mlp = None
-    if model_name in ['gdro', 'coral', 'mmd']:
-        if setting is not None and target is not None:
-            best_mlp = load_best_mlp_params(setting, target, 
-                                            val_strategy='mean')
-            if best_mlp:
-                logger.info(f"Inheriting MLP params for {model_name}: {best_mlp.get('hidden_dims')}")
-                n_iter = max(1, n_iter // 2)  # Reduce iterations since we're inheriting MLP params
 
     random_configs = []
     for _ in range(n_iter):
@@ -200,18 +178,14 @@ def get_random_params(model_name, n_iter=10, setting=None, target=None):
             }
 
         elif model_name in ['mlp', 'gdro', 'coral', 'mmd']:
-            # Pre-load MLP best params for derivative models
-            if best_mlp and model_name != 'mlp':
-                params = best_mlp.copy()
-            else:
-                # Base deep learning params
-                params = {
-                    'hidden_dims': rng.choice([[128, 64], [256, 128], [512, 256, 128]]),
-                    'lr': sample_log_uniform(1e-5, 1e-2, np_rng),
-                    'dropout': float(np_rng.uniform(0.0, 0.5)),
-                    'n_epochs': 100,
-                    'batch_size': rng.choice([512, 1024, 2048])
-                }
+            # Base deep learning params
+            params = {
+                'hidden_dims': rng.choice([[128, 64], [256, 128], [512, 256, 128]]),
+                'lr': sample_log_uniform(1e-5, 1e-2, np_rng),
+                'dropout': float(np_rng.uniform(0.0, 0.5)),
+                'n_epochs': 100,
+                'batch_size': rng.choice([512, 1024, 2048])
+            }
 
             # Model-specific logic
             if model_name == 'gdro':
