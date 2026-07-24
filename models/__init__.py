@@ -7,6 +7,7 @@ Available models:
   - 'xgb'              : XGBoost Regressor
   - 'xgb_conservative' : XGBoost with conservative feature set (TA, VPD, SW_IN, EVI, NDWI_SWIR2, PFT_*)
   - 'mlp'           : Multi-layer Perceptron
+  - 'lstm'          : Seq2seq LSTM baseline on the hourly series (sequential)
   - 'gdro'          : Group DRO (worst-group loss minimization)
   - 'coral'         : CORAL domain adaptation
   - 'mmd'           : MMD domain adaptation (fixed multi-scale kernel bandwidths)
@@ -73,7 +74,11 @@ def get_model(model_name, params=None):
     elif model_name == 'mlp':
         from .mlp import MLP
         return MLP(**params)
-    
+
+    elif model_name == 'lstm':
+        from .lstm import LSTMRegressor
+        return LSTMRegressor(**params)
+
     elif model_name == 'gdro':
         from .gdro import GroupDRO
         return GroupDRO(**params)
@@ -101,7 +106,7 @@ def get_model(model_name, params=None):
     else:
         raise NotImplementedError(
             f"Model `{model_name}` not implemented. "
-            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'gdro', 'coral', 'mmd', 'mmd-median', 'maxrm_mse', 'maxrm_regret'"
+            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'lstm', 'gdro', 'coral', 'mmd', 'mmd-median', 'maxrm_mse', 'maxrm_regret'"
         )
 
 
@@ -180,6 +185,19 @@ def get_random_params(model_name, n_iter=10):
                 'verbosity': -1,
                 'n_jobs': 4,
                 'boosting_type': 'goss',
+            }
+
+        elif model_name == 'lstm':
+            # Small, readable sequence model: search over the standard knobs.
+            # Windowing (window/warmup/stride) is fixed by the CLI, not tuned,
+            # so the sequence split can be built once per (setting, target).
+            params = {
+                'hidden_size': rng.choice([64, 128]),
+                'num_layers': rng.choice([1, 2]),
+                'dropout': float(np_rng.uniform(0.0, 0.3)),
+                'lr': sample_log_uniform(1e-4, 1e-2, np_rng),
+                'batch_size': rng.choice([32, 64, 128]),
+                'n_epochs': 100,
             }
 
         elif model_name in ['mlp', 'gdro', 'coral', 'mmd', 'mmd-median']:
