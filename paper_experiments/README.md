@@ -110,3 +110,21 @@ display_names = {
 ```bash
 python eval.py
 ```
+
+---
+
+## Per-scale RMSE with bootstrap error bars
+
+Plots RMSE against temporal scale, one panel per extrapolation scenario and one colour per model. Error bars are percentile CIs from a nonparametric bootstrap over the held-out sites (resample sites with replacement, recompute the aggregate).
+
+```bash
+python paper_experiments/scale_rmse_bootstrap_plots.py --target all
+```
+
+Useful flags: `--n_boot` (resamples, default 1000), `--ci` (default 95), `--val_strategy` (default `mean`).
+
+**Outputs** saved to `paper_experiments/plots/`, for each target and each aggregation (`median`, `q90`):
+- `scale_rmse_{aggname}_{target}.png` — the figure
+- `scale_rmse_{aggname}_{target}_ci.csv` — point estimates and CI bounds for every (scenario, model, scale)
+
+The hourly-scale CI widths are also printed to stdout.
