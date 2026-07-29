@@ -9,15 +9,19 @@ from utils.utils import setup_logging, get_predictions_path, load_csv, save_csv
 
 logger = setup_logging(__name__)
 
-# Fixed site groups for the two spatial-extrapolation settings. Defined once and
-# shared by BOTH the flat (row-wise) baselines and the sequence (LSTM) split so
-# the two paths always see identical train/val/test membership.
+# Fixed site groups for the spatial-extrapolation settings.
+# `spatial-easy40-v2` is a re-draw of `spatial-easy40`: it keeps the SAME 20
+# validation sites and replaces the 40 test sites with a fresh uniform sample
+# (without replacement, seed 20260726, numpy default_rng) drawn from the
+# spatial-easy40 train+test pool 
 _SPATIAL_TEST_GROUPS = {
     'spatial-easy40': ['US-Tw1', 'DE-Hai', 'US-Seg', 'US-Sne', 'US-Tw4', 'US-xDL', 'UK-AMo', 'AU-Dry', 'US-CGG', 'FR-Bil', 'US-Rpf', 'DK-Skj', 'RU-Fy2', 'DE-Rns', 'US-Tw3', 'RU-Fyo', 'US-Snf', 'CH-Cha', 'AR-CCg', 'CL-SDF', 'DE-Gri', 'FR-Tou', 'AU-Whr', 'AU-GWW', 'US-RGo', 'IT-BCi', 'ES-Abr', 'SE-Nor', 'DE-Hzd', 'US-CS2', 'US-StJ', 'CA-TP3', 'BE-Dor', 'US-xWD', 'US-Syv', 'DE-RuR', 'CZ-BK1', 'BE-Maa', 'BE-Vie', 'FI-Var'],
+    'spatial-easy40-v2': ['AU-DaS', 'BE-Bra', 'BE-Maa', 'CA-ARB', 'CA-Cbo', 'CA-DB2', 'CA-EM1', 'CH-Cha', 'CL-SDF', 'ES-Abr', 'ES-LJu', 'FI-Hyy', 'FI-Qvd', 'FR-Gri', 'IT-BCi', 'IT-BFt', 'IT-Cp2', 'IT-Lsn', 'US-A32', 'US-ARM', 'US-CF4', 'US-Cst', 'US-DS3', 'US-Dmg', 'US-HB2', 'US-HB3', 'US-Ho2', 'US-MMS', 'US-Me6', 'US-NC4', 'US-Rws', 'US-SRM', 'US-Snf', 'US-Srr', 'US-StJ', 'US-xDJ', 'US-xHE', 'US-xJE', 'US-xJR', 'US-xUK'],
     'TA40': ['AU-Dry', 'AU-DaS', 'AU-Lit', 'BR-Npw', 'AU-Lon', 'AU-ASM', 'US-xDS', 'US-ONA', 'US-SP1', 'US-xJE', 'US-SRM', 'US-HB2', 'AU-GWW', 'US-SRS', 'US-SRG', 'IL-Yat', 'US-HB3', 'US-HB1', 'US-xDL', 'US-RGA', 'AU-Cum', 'US-xTA', 'AU-Cpr', 'US-Whs', 'US-Cst', 'US-Wkg', 'IT-BCi', 'US-Jo2', 'IT-Cp2', 'US-RGo', 'ES-Abr', 'US-NC4', 'ES-Agu', 'US-Akn', 'US-xJR', 'ES-Pdu', 'US-Ton', 'ES-LM2', 'IT-Noe', 'ES-LM1'],
 }
 _SPATIAL_VAL_GROUPS = {
     'spatial-easy40': ['DE-Tha', 'US-xTR', 'US-ICh', 'FR-Aur', 'US-NR1', 'CA-TPD', 'AU-Cum', 'US-RGA', 'CZ-Lnz', 'US-UC1', 'SE-Htm', 'AU-Rgf', 'ES-Agu', 'FR-Mej', 'CA-ARF', 'CA-TP1', 'CA-SCC', 'US-BZB', 'US-xCP', 'DK-Vng'],
+    'spatial-easy40-v2': ['DE-Tha', 'US-xTR', 'US-ICh', 'FR-Aur', 'US-NR1', 'CA-TPD', 'AU-Cum', 'US-RGA', 'CZ-Lnz', 'US-UC1', 'SE-Htm', 'AU-Rgf', 'ES-Agu', 'FR-Mej', 'CA-ARF', 'CA-TP1', 'CA-SCC', 'US-BZB', 'US-xCP', 'DK-Vng'],
     'TA40': ['US-Snf', 'US-GLE', 'US-CF2', 'FI-Let', 'CZ-Lnz', 'US-Rls', 'UK-AMo', 'FR-Gri', 'US-xTR', 'US-ALQ', 'CA-ER1', 'US-xBR', 'FI-Hyy', 'IE-Cra', 'DE-Obe', 'AU-War', 'US-RGB', 'CH-Cha', 'US-Syv', 'US-UMB'],
 }
 

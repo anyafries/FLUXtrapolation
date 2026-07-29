@@ -76,3 +76,37 @@ Rscript paper_experiments/plot_regions_and_splits.R
 - `site_split_ta.png` — map showing temperature-based train/test split
 - `time_split.png` — combined time-series panel showing temporal split
 - `time_split_{site}.png` — individual time-series for example sites
+
+---
+
+## Re-draw of the spatial extrapolation split
+
+Robustness check: `spatial-easy40-v2` (defined in `dataloader.py`) keeps the same 20 validation sites as `spatial-easy40` but re-samples the 40 test sites from the same pool. It is opt-in, so it is excluded from `--setting all` and must be requested explicitly.
+
+1. Add `spatial-easy40-v2` to the setting choices in `train_model.py` and train the models. 
+
+```python
+    parser.add_argument("--setting", type=str,
+                        choices=['time-split', 'spatial-easy40', 
+                                 'spatial-easy40-v2', 'TA40', 'all'],
+                        default='all', help="Experiment setting")
+```
+
+```bash
+python train_model.py --setting spatial-easy40-v2 --target all --model_name <model>
+```
+
+2. In `eval.py` (lines ~21–26), swap the spatial entry in `display_names`, then evaluate.
+
+```python
+display_names = {
+    "time-split": "temporal",
+    # "spatial-easy40": "spatial",
+    "spatial-easy40-v2": "spatial (re-draw)",
+    "TA40": "temperature"
+}
+```
+
+```bash
+python eval.py
+```
