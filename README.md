@@ -211,13 +211,13 @@ python train_model.py --model_name my-model --setting time-split --target GPP
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `keep_time` | `False` | Keep the `time` column (otherwise dropped before modelling). Always retained internally for the test-set metadata regardless of this flag. |
+| `keep_time` | `False` | Keep the `time` column (otherwise dropped before modelling). |
 | `keep_lonlat` | `False` | Keep `tower_lat` / `tower_lon` as features instead of dropping them. |
-| `validation_split` | `'default'` | How train/val are carved from the non-test sites: `default` (fixed validation-site list), `iid` (stratified random split), `temporal` (year 2022 held out as val), `oracle` (10% of the test sites). |
+| `validation_split` | `'default'` | How train/val are created from the non-test sites: `default` (fixed validation-site list), `iid` (stratified random split over sites), `temporal` (year 2018 held out as val). |
 | `remove_missing_target` | `False` | Drop rows whose target is gap-filled (`qc_mask == 0`) rather than keeping them as NaN. |
 | `standardize` / `astorch` | `False` | Apply a train-fit `RobustScaler` / return `torch.Tensor`s. Driven by the `STANDARDIZE_MODELS` / `ASTORCH_MODELS` lists in `train_model.py`. |
 
-**Sequence mode (LSTM).** Setting `sequence=True` returns time-ordered windows of the hourly series instead of flattened rows (used automatically for `--model_name lstm`). It enables three more windowing knobs, in hourly steps:
+**Data for sequential models.** Setting `sequence=True` returns time-ordered windows of the hourly series instead of flattened rows (used automatically for `--model_name lstm`). It enables three more windowing knobs, in hourly steps:
 
 | Argument | Default | Description |
 |----------|---------|-------------|
