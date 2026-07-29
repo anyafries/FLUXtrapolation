@@ -81,7 +81,13 @@ class _WindowDataset(Dataset):
 
 
 class _LSTMNet(nn.Module):
-    """Plain multi-layer LSTM with a per-timestep linear head (seq2seq)."""
+    """Multi-layer LSTM with a per-timestep linear head (seq2seq).
+
+    The head is fed the current input x_t alongside the LSTM state (a skip
+    connection), so it can recover the instantaneous driver->flux mapping the
+    flat MLP learns directly and use the recurrent state only for a temporal
+    correction. 
+    """
 
     def __init__(self, input_dim, hidden_size, num_layers, dropout):
         super().__init__()
@@ -93,12 +99,13 @@ class _LSTMNet(nn.Module):
             dropout=dropout if num_layers > 1 else 0.0,
         )
         self.dropout = nn.Dropout(dropout)
-        self.head = nn.Linear(hidden_size, 1)
+        self.head = nn.Linear(hidden_size + input_dim, 1)
 
     def forward(self, x):
         # x: (B, L, F) -> out: (B, L)
         h, _ = self.lstm(x)
-        return self.head(self.dropout(h)).squeeze(-1)
+        h = torch.cat([self.dropout(h), x], dim=-1)  # skip current input to head
+        return self.head(h).squeeze(-1)
 
 
 class LSTMRegressor:
@@ -111,12 +118,15 @@ class LSTMRegressor:
         lr: Adam learning rate.
         n_epochs: max epochs (early stopping usually stops sooner).
         batch_size: number of windows per training batch.
-        early_stopping_rounds: patience (epochs) on the validation loss.
+        early_stopping_rounds: patience (epochs) on the validation loss. Higher
+            than the flat MLP's (10) because the window-based loader yields far
+            fewer, more autocorrelated gradient steps per epoch, so the LSTM
+            needs more epochs to converge and stops prematurely with patience 10.
         loss: 'mse' or 'huber'.
     """
 
     def __init__(self, hidden_size=64, num_layers=1, dropout=0.1, lr=1e-3,
-                 n_epochs=100, batch_size=64, early_stopping_rounds=10,
+                 n_epochs=100, batch_size=64, early_stopping_rounds=20,
                  loss='mse', eval_batch_size=128, seed=42):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
