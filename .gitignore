@@ -26,3 +26,6 @@ paper_experiments/distribution_distances/NEE.txt
 # other projects
 archive*
 paper_experiments/.Rhistory
+paper_experiments/extremeness/*
+paper_experiments/paper_plots_old_with_saturation.py
+paper_experiments/validation_strategies/*

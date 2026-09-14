@@ -1,6 +1,5 @@
 """Plotting functions for FLUXNET benchmark results."""
 
-
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
@@ -14,16 +13,14 @@ logger = setup_logging(__name__)
 
 PLOTS_DIR = 'results/plots'
 SCALES = ['hourly', 'daily', 'weekly', 'monthly', 'seasonal', 'anom', 'iav']
-
-# Model ordering: lr first, xgb second, then alphabetically
-MODEL_ORDER = ['xgb', 'lightgbm', 'mlp',
-               'gdro', 'coral', 'mmd',
-            #    'maxrm_mse', 'maxrm_regret',
+SETTINGS_ORDER = ['time-split', 'spatial-easy40', 'TA40']
+HIGHER_IS_BETTER = {'nse', 'r2_score', 'pearson_corr'}
+MODEL_ORDER = ['xgb', 'lightgbm', 'mlp', 'lstm',
+               'gdro', 'coral', 'mmd', 
+            #    'tabpfn', 'maxrm(mse)', 'maxrm(reg)',
                'lr', 'robust-lr', 'ridge',  'constant']
 color_palette = sns.color_palette("tab10", n_colors=len(MODEL_ORDER))
 MODEL_COLORS = {model: color_palette[i] for i, model in enumerate(MODEL_ORDER)}
-
-# Extra colors for methods not in MODEL_ORDER, assigned in order of appearance
 _EXTRA_PALETTE = sns.color_palette("Set2") + sns.color_palette("tab20")
 
 
@@ -38,18 +35,6 @@ def get_model_colors(models):
     for i, model in enumerate(extras):
         colors[model] = _EXTRA_PALETTE[i % len(_EXTRA_PALETTE)]
     return colors
-
-# Setting ordering: time-split, spatial-easy, spatial-hard
-SETTINGS_ORDER = ['time-split', 'spatial-easy40', 'TA40',
-                  'spatial-easy', 'spatial-hard', 
-                  'LST', 'TA', 'VPD', 
-                  'PFT_CRO', 'PFT_ENF', 'PFT_GRA', 'PFT_WET', 
-                  'forest', 'grass-savanna', 'schrub-savanna',
-                  'europe', 'rest-of-world',
-                  ] + [f'hard-{i}' for i in range(1, 6)] + ['time-space']
-
-# Metrics where higher is better (affects sorting direction and labels)
-HIGHER_IS_BETTER = {'nse', 'r2_score', 'pearson_corr'}
 
 
 def get_ordered_models(models):
@@ -469,7 +454,6 @@ def get_weighted_skill_scores(df, baseline_model='constant'):
 # TODO: add option for higher-is-better metrics
 # TODO: make more modular/general -> only for one scale for example
 # https://pandas.pydata.org/docs/user_guide/style.html
-import pandas as pd
 def create_html_leaderboard(
     df,
     target,
@@ -569,6 +553,7 @@ def create_html_leaderboard(
     html_output = f'<meta charset="UTF-8">\n{styler.to_html()}'
     with open(filename, 'w', encoding='utf-8') as f:
         f.write(html_output)
+    print(f"Saved HTML leaderboard to {filename}")
     
     return html_output
 

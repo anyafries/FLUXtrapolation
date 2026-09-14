@@ -138,6 +138,11 @@ def save_best_params(best_params, setting, target, model_name, val_strategy,
     # Ensure the directory exists (in case it's the first file being saved)
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
+    # numpy scalars (e.g. float32 from pandas/numpy reductions) aren't JSON
+    # serializable, so coerce to a native Python float first.
+    if val_score is not None:
+        val_score = float(val_score)
+
     with open(path, 'w') as f:
         json.dump({'params': best_params, 'val_score': val_score}, f, indent=4)
     logger.info(f"Saved best parameters to {path}")
