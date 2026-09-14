@@ -11,7 +11,7 @@ A benchmark for evaluating ML models under distribution shift using FLUXNET eddy
 
 ## Leaderboard
 
-A leaderboard is available at [link removed for anonymity], with submissions accepted via pull request. See [example_leaderboard.pdf](example_leaderboard.pdf) for a preview (download for best viewing).
+A leaderboard is available at [link removed for anonymity], with submissions accepted via an upload form.
 
 ---
 
@@ -29,12 +29,15 @@ PyTorch uses CPU by default. For GPU support, install the appropriate CUDA versi
 
 ## Data
 
-**Data can be downloaded using the link in the paper.**
+The data consists of one CSV per FLUXNET site, available on Harvard Dataverse (link included here after the review process, currently available in the link in the paper).
+All the sites should be downloaded and saved in `data/sites/`. 
 
-Each site is stored as a CSV as should be saved in `data/sites/`. The benchmark uses **13 covariates** per hourly observation:
+The data consists of **13 covariates** per hourly observation:
 - **Meteorological:** air temperature (TA), vapor pressure deficit (VPD), incoming shortwave radiation (SW\_IN), and others
 - **Site characteristics:** IGBP vegetation type
 - **Satellite-derived:** enhanced vegetation index (EVI), land surface temperature (LST), normalized difference water index (NDWI), and others
+
+The CSV that is already present at `data/sites_with_2018.csv` is a list of site IDs used for the temporal scenario (the sites with at least five years of data and observations in 2018).
 
 ---
 
