@@ -17,7 +17,7 @@ SETTINGS_ORDER = ['time-split', 'spatial-easy40', 'TA40']
 HIGHER_IS_BETTER = {'nse', 'r2_score', 'pearson_corr'}
 MODEL_ORDER = ['xgb', 'lightgbm', 'mlp', 'lstm',
                'gdro', 'coral', 'mmd', 
-            #    'tabpfn', 'maxrm(mse)', 'maxrm(reg)',
+            #    'tabpfn',
                'lr', 'robust-lr', 'ridge',  'constant']
 color_palette = sns.color_palette("tab10", n_colors=len(MODEL_ORDER))
 MODEL_COLORS = {model: color_palette[i] for i, model in enumerate(MODEL_ORDER)}

@@ -12,8 +12,6 @@ Available models:
   - 'coral'         : CORAL domain adaptation
   - 'mmd'           : MMD domain adaptation (fixed multi-scale kernel bandwidths)
   - 'mmd-median'    : MMD domain adaptation (median-heuristic kernel bandwidth)
-  - 'maxrm_mse'     : MaxRM Random Forest with MSE risk
-  - 'maxrm_regret'  : MaxRM Random Forest with regret risk
 """
 
 import numpy as np
@@ -95,18 +93,10 @@ def get_model(model_name, params=None):
         from .coral import MMD
         return MMD(bandwidth_mode="median", **params)
 
-    elif model_name == 'maxrm-mse':
-        from .maxrm_rf import MaxRM_RF
-        return MaxRM_RF(risk='mse', **params)
-    
-    elif model_name == 'maxrm-regret':
-        from .maxrm_rf import MaxRM_RF
-        return MaxRM_RF(risk='regret', **params)
-    
     else:
         raise NotImplementedError(
             f"Model `{model_name}` not implemented. "
-            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'lstm', 'gdro', 'coral', 'mmd', 'mmd-median', 'maxrm_mse', 'maxrm_regret'"
+            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'lstm', 'gdro', 'coral', 'mmd', 'mmd-median'"
         )
 
 
@@ -146,13 +136,6 @@ def get_random_params(model_name, n_iter=10):
             params = {
                 'alpha': sample_log_uniform(1e-3, 1e2, np_rng),
                 'epsilon': float(np_rng.uniform(1.1, 2.0))
-            }
-
-        elif model_name in ['maxrm_mse', 'maxrm_regret']:
-            params = {
-                'n_estimators': rng.choice([100, 200, 500, 1000]),
-                'min_samples_leaf': rng.randint(5, 50),
-                'random_state': 42,
             }
 
         elif model_name in ['xgb', 'xgb_conservative']:
