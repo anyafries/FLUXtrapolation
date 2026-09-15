@@ -119,7 +119,7 @@ def sample_log_uniform(low, high, rng):
     return float(10 ** rng.uniform(np.log10(low), np.log10(high)))
 
 
-def get_random_params(model_name, n_iter=10):
+def get_random_params(model_name, n_iter=20):
     """
     Generates N random parameter sets for a given model.
     
@@ -134,7 +134,8 @@ def get_random_params(model_name, n_iter=10):
         return [{}]
 
     random_configs = []
-    for _ in range(n_iter):
+    n_off = max(1, n_iter // 10)   # reserve ~1 penalty-off (ERM) config per 10 draws
+    for it in range(n_iter):
         params = {}
 
         if model_name == 'ridge':
@@ -192,10 +193,10 @@ def get_random_params(model_name, n_iter=10):
             # Windowing (window/warmup/stride) is fixed by the CLI, not tuned,
             # so the sequence split can be built once per (setting, target).
             params = {
-                'hidden_size': rng.choice([64, 128]),
+                'hidden_size': rng.choice([32, 64, 128]),
                 'num_layers': rng.choice([1, 2]),
                 'dropout': float(np_rng.uniform(0.0, 0.3)),
-                'lr': sample_log_uniform(1e-4, 1e-2, np_rng),
+                'lr': sample_log_uniform(1e-4, 1e-1, np_rng),
                 'batch_size': rng.choice([32, 64, 128]),
                 'n_epochs': 100,
             }
@@ -203,23 +204,23 @@ def get_random_params(model_name, n_iter=10):
         elif model_name in ['mlp', 'gdro', 'coral', 'mmd', 'mmd-median']:
             # Base deep learning params
             params = {
-                'hidden_dims': rng.choice([[128, 64], [256, 128], [512, 256, 128]]),
+                'hidden_dims': rng.choice([[128, 64], [256, 128], [512, 256, 128], [1024, 512, 256]]),
                 'lr': sample_log_uniform(1e-5, 1e-2, np_rng),
                 'dropout': float(np_rng.uniform(0.0, 0.5)),
                 'n_epochs': 100,
-                'batch_size': rng.choice([512, 1024, 2048])
+                'batch_size': rng.choice([128, 256, 512, 1024])
             }
 
             # Model-specific logic
             if model_name == 'gdro':
-                params['group_weight_step'] = sample_log_uniform(1e-4, 1e-1, np_rng)
+                params['group_weight_step'] = 0.0 if it < n_off else sample_log_uniform(1e-4, 1e-1, np_rng)
             elif model_name == 'coral':
-                params['coral_lambda'] = sample_log_uniform(1e-2, 1e1, np_rng)
+                params['coral_lambda'] = 0.0 if it < n_off else sample_log_uniform(1e-3, 1e2, np_rng)
             elif model_name in ['mmd', 'mmd-median']:
                 # Same lambda search for both; mmd-median differs only in how the
                 # kernel bandwidth is chosen (set in get_model), which is NOT a
                 # tuned hyperparameter.
-                params['mmd_lambda'] = sample_log_uniform(1e-2, 1e1, np_rng)
+                params['mmd_lambda'] = 0.0 if it < n_off else sample_log_uniform(1e-3, 1e1, np_rng)
 
         random_configs.append(params)
 
