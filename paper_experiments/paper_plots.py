@@ -5,7 +5,6 @@ Script to plot results from multiple experiments for the paper.
 import matplotlib.pyplot as plt
 import os
 import pandas as pd
-import seaborn as sns
 import sys
 
 from paper_plot_utils import (
@@ -29,11 +28,11 @@ SETTING_NAMES = {
     'TA40': 'temperature',
 }
 TARGETS = ['ET', 'GPP', 'NEE'] 
-MODELS = ['lr', 'xgb', 'mlp', 'mmd', 'coral', 'gdro', 'constant']
-MODEL_ORDER = ['xgb', 'lightgbm', 'mlp', 'gdro', 'coral', 'mmd', 
-               'lr', 'robust-lr', 'ridge',  'constant']
-color_palette = sns.color_palette("tab10", n_colors=len(MODEL_ORDER))
-MODEL_COLORS = {model: color_palette[i] for i, model in enumerate(MODEL_ORDER)}
+MODELS = ['lr', 'xgb', 'mlp', 'mmd', 'coral', 'gdro', 'constant', 'lstm', 'tabpfn-v2.6', 'tabpfn-v3-ood']
+# Unused: model ordering and colors come from utils.plots.
+# MODEL_ORDER = ['xgb', 'mlp', 'gdro', 'coral', 'mmd', 'lstm', 'tabpfn-v2.6', 'tabpfn-v3-ood', 'lr', 'constant']
+# color_palette = sns.color_palette("tab10", n_colors=len(MODEL_ORDER))
+# MODEL_COLORS = {model: color_palette[i] for i, model in enumerate(MODEL_ORDER)}
 
 RAW_SCALES = ['hourly', 'weekly', 'seasonal', 'anom', 'iav', 'spatial']
 SCALES = ['hourly', 'weekly', 'seasonal', 'anom', 'iav', 'site-mean'] 
@@ -57,7 +56,6 @@ if __name__ == "__main__":
         scales=RAW_SCALES,
         val_strategy='mean',
         rerun=False,
-
     )
     print(results.head())
     results['scale'] = results['scale'].replace({'spatial': 'site-mean'})
@@ -97,32 +95,46 @@ if __name__ == "__main__":
                     main_table=table=='main',
                 )
 
-        # CDF for hourly, weekly, seasonal for TA40 ET
-        results_t = results[results['target'] == target].copy()
-        if target == 'ET':
-            results_t['rmse'] = results_t['rmse'] * 100
-        for scale in ['hourly', 'weekly', 'seasonal', 'site-mean']:
-            fig, ax = plt.subplots(figsize=(1.5, 1.6))
+    # CDF for hourly, weekly, seasonal for TA40 ET
+    models_for_cdf = ['lr', 'xgb', 'mmd', 'gdro', 'lstm', 'tabpfn-v3-ood', 'constant']
+    for scale in ['hourly', 'weekly', 'seasonal', 'site-mean']:
+        fig, axes = plt.subplots(1, 3, figsize=(4.9, 1.7), sharey=True)
+        for i, target in enumerate(TARGETS):
+            results_t = results[(results['target'] == target) & results['model'].isin(models_for_cdf)].copy()
+            if target == 'ET':
+                results_t['rmse'] = results_t['rmse'] * 100
+            ax = axes[i] 
             ax.axhline(0.5, color='gray', linestyle='--', linewidth=0.5)
             ax.axhline(0.9, color='gray', linestyle='--', linewidth=0.5)
             plot_cdf(results_t, scale=scale, target=target, 
                     setting='TA40',  metric='rmse', ax=ax,
-                    linestyle='-', linewidth=1)
+                    linestyle='-', linewidth=0.8)
             if scale == "weekly" and target == "ET":
                 ax.set_xlim(1, 10)
-            ax.set_title('')
-            ax.set_xlabel('RMSE')
-            ax.set_ylabel('Cumulative Probability')
-            leg = ax.legend(
-                title="", 
-                frameon=True, 
-                handlelength=0.6,
-                handleheight=0.4,
-                handletextpad=0.3,
-                labelspacing=0.2,
-                borderpad=0.2,
-            )
-            leg.get_frame().set_linewidth(0.5)
-            leg.get_frame().set_edgecolor('lightgray')
-            plt.savefig(f'{PLOTS_DIR}/cdf_{target}_{scale}.png', bbox_inches='tight', dpi=300)
-            print(f"CDF plot for {target} at {scale} scale saved to {PLOTS_DIR}/cdf_{target}_{scale}.png")
+            ax.set_title(target, pad=1)
+            ax.set_xlabel('RMSE', labelpad=0.5)
+            ax.set_ylabel('Cumulative Probability' if i == 0 else '', labelpad=0.5)
+            # make yticks smaller fontsize
+            ax.tick_params(axis='y', labelsize=7)
+
+        if axes[0].get_legend() is not None:
+            axes[0].get_legend().remove()
+        if axes[1].get_legend() is not None:
+            axes[1].get_legend().remove()
+        leg = axes[2].legend(
+            title="", 
+            frameon=True, 
+            handlelength=0.6,
+            handleheight=0.4,
+            handletextpad=0.3,
+            labelspacing=0.2,
+            borderpad=0.2,
+            loc='center left',
+            bbox_to_anchor=(1.15, 0.5)
+        )
+        leg.get_frame().set_linewidth(0.5)
+        leg.get_frame().set_edgecolor('lightgray')
+        plt.tight_layout()
+        plt.subplots_adjust(right=0.8)
+        plt.savefig(f'{PLOTS_DIR}/cdf_{scale}.png', bbox_inches='tight', dpi=300, pad_inches=0.02)
+        print(f"CDF plot {scale} scale saved to {PLOTS_DIR}/cdf_{scale}.png")
