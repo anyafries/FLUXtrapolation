@@ -130,7 +130,7 @@ def create_latex_leaderboard(
         agg_name = "Median"
     else:
         agg_name = "90th percentile of"
-    title = f"{agg_name} of domain-level {target} {metric.upper()} {direction}"
+    title = f"{agg_name} domain-level {target} {metric.upper()} {direction}"
 
     lines = latex_str.splitlines()
     toprule_idx = next(i for i, line in enumerate(lines) if "\\toprule" in line)
@@ -148,7 +148,7 @@ def create_latex_leaderboard(
     latex_str = "{\\small\n\\setlength{\\tabcolsep}{1.4pt}\n" + latex_str + "\n}\n"
     with open(filename, 'w', encoding='utf-8') as f:
         f.write(latex_str)
-    print(f"Publication-ready LaTeX leaderboard saved to {filename}")
+    print(f"LaTeX leaderboard saved to {filename}")
 
     return latex_str
 

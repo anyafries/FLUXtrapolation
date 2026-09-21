@@ -6,6 +6,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from eval import load_all_metrics
+from utils.plots import get_model_colors, get_ordered_models
 from utils.utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -16,11 +17,6 @@ AGG_FUNC_NAME = 'median'
 
 RAW_SCALES = ['hourly', 'weekly', 'seasonal', 'anom', 'iav', 'spatial']
 SCALES = ['hourly', 'weekly', 'seasonal', 'anom', 'iav', 'site-mean']
-
-MODEL_ORDER = ['xgb', 'lightgbm', 'mlp', 'gdro', 'coral', 'mmd',
-               'lr', 'robust-lr', 'ridge', 'constant']
-color_palette = sns.color_palette("tab10", n_colors=len(MODEL_ORDER))
-MODEL_COLORS = {model: color_palette[i] for i, model in enumerate(MODEL_ORDER)}
 
 PLOTS_DIR = os.path.join(os.path.dirname(__file__), 'plots', 'val_strategies')
 STYLE_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils', 'neurips.mplstyle')
@@ -47,11 +43,11 @@ def plot_val_comparison(data, x_col, x_order, title_suffix, filename_suffix):
         agg[x_col] = pd.Categorical(agg[x_col], categories=x_order, ordered=True)
         for ax, scale in zip(axes.flatten(), SCALES):
             df_s = agg[agg['scale'] == scale].sort_values(x_col)
-            present_models = [m for m in MODEL_ORDER if m in df_s['model'].unique()]
+            present_models = get_ordered_models(df_s['model'].unique())
             sns.lineplot(
                 data=df_s, x=x_col, y='rmse', hue='model',
                 hue_order=present_models,
-                palette={m: MODEL_COLORS[m] for m in present_models},
+                palette=get_model_colors(present_models),
                 markers=True, marker='o', ax=ax, linewidth=1, markersize=3,
             )
             ax.set_title(scale)
@@ -64,8 +60,7 @@ def plot_val_comparison(data, x_col, x_order, title_suffix, filename_suffix):
                 legend_ax = ax
 
         if legend_ax is not None:
-            handles, labels = legend_ax.lines, [m for m in MODEL_ORDER
-                                                if m in agg['model'].unique()]
+            handles, labels = legend_ax.lines, get_ordered_models(agg['model'].unique())
             handles = [legend_ax.lines[i] for i in range(len(labels))]
             fig.legend(handles, labels, loc='lower center', ncol=5,
                        fontsize=7, bbox_to_anchor=(0.5, -0.05))

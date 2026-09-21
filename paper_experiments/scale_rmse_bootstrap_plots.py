@@ -28,10 +28,10 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from eval import load_all_metrics  # noqa: E402
+from utils.plots import get_model_colors, get_ordered_models  # noqa: E402
 from utils.utils import setup_logging  # noqa: E402
 
 logger = setup_logging(__name__)
@@ -53,12 +53,6 @@ SCALES = ['hourly', 'weekly', 'seasonal', 'anom', 'iav', 'site-mean']
 # The "paper set". Models with no metrics on disk (e.g. lstm until it is run)
 # are simply skipped -- load_all_metrics only returns what exists.
 MODELS = ['xgb', 'mlp', 'lstm', 'coral', 'gdro', 'mmd', 'lr', 'constant']
-MODEL_ORDER = ['xgb', 'lightgbm', 'mlp', 'lstm', 'gdro', 'coral', 'mmd',
-               'lr', 'robust-lr', 'ridge', 'constant']
-# husl gives evenly-spaced, distinct hues for all models (tab10 only has 10,
-# which would collide xgb and constant).
-_palette = sns.color_palette("husl", n_colors=len(MODEL_ORDER))
-MODEL_COLORS = {m: _palette[i] for i, m in enumerate(MODEL_ORDER)}
 
 PLOTS_DIR = 'paper_experiments/plots'
 STYLE_FILE_PATH = 'utils/neurips.mplstyle'
@@ -104,10 +98,11 @@ def plot_target(results, target, aggname, n_boot, ci, seed, outdir):
         rt['rmse'] = rt['rmse'] * 100.0  # match paper_plots.py units
     rt['site'] = rt['env'].map(_site)
 
-    models = [m for m in MODEL_ORDER if m in set(rt['model'])]
+    models = get_ordered_models(set(rt['model']))
     if not models:
         logger.warning(f"No models with data for target {target}; skipping.")
         return
+    model_colors = get_model_colors(models)
 
     x = np.arange(len(SCALES))
     # Small horizontal dodge so overlapping markers/whiskers stay legible.
@@ -162,7 +157,7 @@ def plot_target(results, target, aggname, n_boot, ci, seed, outdir):
             ax.errorbar(
                 xs, ys, yerr=[lo_err, hi_err],
                 marker='o', markersize=3, linestyle='-', linewidth=0.7,
-                color=MODEL_COLORS.get(model, 'gray'), label=model,
+                color=model_colors[model], label=model,
                 capsize=1.5, elinewidth=0.7, alpha=0.9,
             )
         ax.set_title(SETTING_NAMES.get(setting, setting))
