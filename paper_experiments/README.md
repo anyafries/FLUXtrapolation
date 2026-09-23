@@ -49,33 +49,21 @@ python paper_experiments/distribution_distances/analyze.py
 
 ---
 
-## RMSE across temporal scales, with bootstrap error bars
+## Per-scale RMSE with bootstrap error bars
 
-Plots RMSE for every model across the temporal scales (hourly → site-mean), with
-one panel per extrapolation scenario (temporal, spatial, temperature). Two
-figures are produced: one where each model's per-site errors are summarized by
-the median, one by the 90th percentile.
+Plots RMSE against temporal scale, one panel per extrapolation scenario and one colour per model. Error bars are percentile CIs from a nonparametric bootstrap over the held-out sites (resample sites with replacement, recompute the aggregate).
 
 ```bash
-python paper_experiments/scale_rmse_bootstrap_plot.py --target ET
+python paper_experiments/scale_rmse_bootstrap_plots.py --target all
 ```
 
-`--target` can be `ET`, `GPP`, `NEE`, or `all`. Other options: `--n_boot`
-(resamples, default 1000), `--ci` (interval width, default 95), `--val_strategy`.
+Useful flags: `--n_boot` (resamples, default 1000), `--ci` (default 95), `--val_strategy` (default `mean`).
 
-**How the error bars are made.** The dot for each model is its RMSE summarized
-across the held-out sites (median or 90th percentile). To show how much that
-number depends on *which* sites we happened to test on, we resample the held-out
-sites with replacement and recompute it — 1000 times. We resample whole sites
-(not individual records) because the readings from one site are related to each
-other. The error bar spans the middle 95% of those 1000 values.
+**Outputs** saved to `paper_experiments/plots/`, for each target and each aggregation (`median`, `q90`):
+- `scale_rmse_{aggname}_{target}.png` — the figure
+- `scale_rmse_{aggname}_{target}_ci.csv` — point estimates and CI bounds for every (scenario, model, scale)
 
-The script also prints, for the hourly scale, how wide each interval is — both in
-raw RMSE and as a percentage of the dot it belongs to.
-
-**Outputs** saved to `paper_experiments/plots/`:
-- `scale_rmse_median_{target}.png` — RMSE summarized by the median
-- `scale_rmse_q90_{target}.png` — RMSE summarized by the 90th percentile
+The hourly-scale CI widths are also printed to stdout.
 
 ---
 
@@ -141,20 +129,3 @@ display_names = {
 python eval.py
 ```
 
----
-
-## Per-scale RMSE with bootstrap error bars
-
-Plots RMSE against temporal scale, one panel per extrapolation scenario and one colour per model. Error bars are percentile CIs from a nonparametric bootstrap over the held-out sites (resample sites with replacement, recompute the aggregate).
-
-```bash
-python paper_experiments/scale_rmse_bootstrap_plots.py --target all
-```
-
-Useful flags: `--n_boot` (resamples, default 1000), `--ci` (default 95), `--val_strategy` (default `mean`).
-
-**Outputs** saved to `paper_experiments/plots/`, for each target and each aggregation (`median`, `q90`):
-- `scale_rmse_{aggname}_{target}.png` — the figure
-- `scale_rmse_{aggname}_{target}_ci.csv` — point estimates and CI bounds for every (scenario, model, scale)
-
-The hourly-scale CI widths are also printed to stdout.
