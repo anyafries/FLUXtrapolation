@@ -1,13 +1,15 @@
 """
 Per-scale RMSE across scenarios, with site-bootstrap error bars.
 
-For a given target, produces two figures -- one aggregating the held-out-env
-RMSE by the median, one by the 0.9 quantile (q90). Each figure has:
+For a given target, produces one figure with a 2x3 grid of panels:
 
-  * x axis: temporal scale (hourly, weekly, seasonal, anom, iav, site-mean)
-  * y axis: RMSE (ET is shown x100, matching paper_plots.py)
-  * three panels: the three OOD scenarios (temporal / spatial / temperature)
-  * colour: model
+  * rows: held-out-env RMSE aggregated by the median (top) and the 0.9
+    quantile (q90, bottom)
+  * columns: the three OOD scenarios (temporal / spatial / temperature)
+  * x axis (shared): temporal scale (hourly, weekly, seasonal, anom, iav,
+    site-mean)
+  * y axis: RMSE (ET values are x100, matching paper_plots.py)
+  * colour: model, with one legend shared by all panels
 
 Error bars come from a nonparametric bootstrap over the *held-out sites*: for
 each (scenario, model, scale) cell we resample the set of test sites with
@@ -52,7 +54,10 @@ SCALES = ['hourly', 'weekly', 'seasonal', 'anom', 'iav', 'site-mean']
 # --- models (colour) --------------------------------------------------------
 # The "paper set". Models with no metrics on disk (e.g. lstm until it is run)
 # are simply skipped -- load_all_metrics only returns what exists.
-MODELS = ['xgb', 'mlp', 'lstm', 'coral', 'gdro', 'mmd', 'lr', 'constant']
+# MODELS = ['xgb', 'mlp', 'lstm', 'coral', 'gdro', 'mmd', 'lr', 'constant',
+#           'tabpfn-v2.6', 'tabpfn-v3-ood']
+# Same models as the CDF plot in paper_plots.py (models_for_cdf).
+MODELS = ['lr', 'xgb', 'mmd', 'gdro', 'lstm', 'tabpfn-v3-ood', 'constant']
 
 PLOTS_DIR = 'paper_experiments/plots'
 STYLE_FILE_PATH = 'utils/neurips.mplstyle'
@@ -91,8 +96,54 @@ def bootstrap_ci(rmse_by_site, aggfunc, n_boot, ci, rng):
     return np.nanpercentile(stats, half), np.nanpercentile(stats, 100.0 - half)
 
 
-def plot_target(results, target, aggname, n_boot, ci, seed, outdir):
+def plot_panel(ax, rs, models, model_colors, offsets, aggname,
+               n_boot, ci, seed, meta):
+    """Draw one (aggregate, scenario) panel from the rows `rs` of one setting.
+
+    Returns one CI row per (model, scale) cell, each prefixed with `meta`.
+    """
     aggfunc = AGGS[aggname]
+    rows = []
+    for mi, model in enumerate(models):
+        rm = rs[rs['model'] == model]
+        xs, ys, lo_err, hi_err = [], [], [], []
+        for xi, scale in enumerate(SCALES):
+            cell = rm[rm['scale'] == scale]
+            vals = cell['rmse'].to_numpy(dtype=float)
+            vals = vals[~np.isnan(vals)]
+            if vals.size == 0:
+                continue
+            point = aggfunc(vals)
+            rmse_by_site = {
+                s: g['rmse'].to_numpy(dtype=float)
+                for s, g in cell.groupby('site')
+            }
+            rng = np.random.default_rng(seed + 1000 * mi + xi)
+            lo, hi = bootstrap_ci(rmse_by_site, aggfunc, n_boot, ci, rng)
+            width = hi - lo
+            pct = 100.0 * width / abs(point) if point else float('nan')
+            rows.append({
+                **meta, 'model': model, 'scale': scale,
+                'n_sites': len(rmse_by_site),
+                'point': point, 'ci_lo': lo, 'ci_hi': hi,
+                'ci_width': width, 'ci_width_pct_of_point': pct,
+            })
+            xs.append(xi + offsets[mi])
+            ys.append(point)
+            lo_err.append(max(point - lo, 0.0) if np.isfinite(lo) else 0.0)
+            hi_err.append(max(hi - point, 0.0) if np.isfinite(hi) else 0.0)
+        if not xs:
+            continue
+        ax.errorbar(
+            xs, ys, yerr=[lo_err, hi_err],
+            marker='o', markersize=0.9, linestyle='-', linewidth=0.6,
+            color=model_colors[model], label=model,
+            capsize=1, elinewidth=0.6, alpha=0.9,
+        )
+    return rows
+
+
+def plot_target(results, target, n_boot, ci, seed, outdir):
     rt = results[results['target'] == target].copy()
     if target == 'ET':
         rt['rmse'] = rt['rmse'] * 100.0  # match paper_plots.py units
@@ -111,107 +162,60 @@ def plot_target(results, target, aggname, n_boot, ci, seed, outdir):
     else:
         offsets = np.array([0.0])
 
-    fig, axes = plt.subplots(1, len(SETTINGS), figsize=(7.0, 2.2),
-                             sharex=True)
-    if len(SETTINGS) == 1:
-        axes = [axes]
+    # Rows: aggregates (median on top, q90 below); columns: scenarios.
+    fig, axes = plt.subplots(len(AGGS), len(SETTINGS), figsize=(6.5, 3),
+                             sharex=True, squeeze=False)
 
-    hourly_rows = []  # (setting, model, point, lo, hi) for the printed summary
-    all_rows = []     # every scale, written to CSV
+    all_rows = []  # every (agg, scenario, model, scale) cell, written to CSV
+    for r, aggname in enumerate(AGGS):
+        for c, setting in enumerate(SETTINGS):
+            meta = {'target': target, 'agg': aggname,
+                    'scenario': SETTING_NAMES.get(setting, setting),
+                    'setting': setting}
+            all_rows += plot_panel(
+                axes[r, c], rt[rt['setting'] == setting], models,
+                model_colors, offsets, aggname, n_boot, ci, seed, meta)
+        axes[r, 0].set_ylabel(f'{aggname} RMSE')
 
-    for ax, setting in zip(axes, SETTINGS):
-        rs = rt[rt['setting'] == setting]
-        for mi, model in enumerate(models):
-            rm = rs[rs['model'] == model]
-            xs, ys, lo_err, hi_err = [], [], [], []
-            for xi, scale in enumerate(SCALES):
-                cell = rm[rm['scale'] == scale]
-                vals = cell['rmse'].to_numpy(dtype=float)
-                vals = vals[~np.isnan(vals)]
-                if vals.size == 0:
-                    continue
-                point = aggfunc(vals)
-                rmse_by_site = {
-                    s: g['rmse'].to_numpy(dtype=float)
-                    for s, g in cell.groupby('site')
-                }
-                rng = np.random.default_rng(seed + 1000 * mi + xi)
-                lo, hi = bootstrap_ci(rmse_by_site, aggfunc, n_boot, ci, rng)
-                width = hi - lo
-                pct = 100.0 * width / abs(point) if point else float('nan')
-                all_rows.append({
-                    'target': target, 'agg': aggname, 'scenario':
-                    SETTING_NAMES.get(setting, setting), 'setting': setting,
-                    'model': model, 'scale': scale, 'n_sites': len(rmse_by_site),
-                    'point': point, 'ci_lo': lo, 'ci_hi': hi,
-                    'ci_width': width, 'ci_width_pct_of_point': pct,
-                })
-                if scale == 'hourly':
-                    hourly_rows.append((setting, model, point, lo, hi))
-                xs.append(xi + offsets[mi])
-                ys.append(point)
-                lo_err.append(max(point - lo, 0.0) if np.isfinite(lo) else 0.0)
-                hi_err.append(max(hi - point, 0.0) if np.isfinite(hi) else 0.0)
-            if not xs:
-                continue
-            ax.errorbar(
-                xs, ys, yerr=[lo_err, hi_err],
-                marker='o', markersize=3, linestyle='-', linewidth=0.7,
-                color=model_colors[model], label=model,
-                capsize=1.5, elinewidth=0.7, alpha=0.9,
-            )
-        ax.set_title(SETTING_NAMES.get(setting, setting))
-        ax.set_xticks(x)
-        ax.set_xticklabels(SCALES, rotation=45, ha='right')
-        ax.set_xlabel('temporal scale')
+    for c, setting in enumerate(SETTINGS):
+        axes[0, c].set_title(SETTING_NAMES.get(setting, setting))
+        axes[-1, c].set_xticks(x)
+        axes[-1, c].set_xticklabels(SCALES, rotation=45, ha='right')
 
-    ylabel = 'RMSE (x100)' if target == 'ET' else 'RMSE'
-    axes[0].set_ylabel(f'{aggname} {ylabel}')
-
-    # Single shared legend from the first panel's handles.
-    handles, labels = axes[0].get_legend_handles_labels()
-    # De-duplicate while keeping order.
-    seen, h2, l2 = set(), [], []
-    for h, l in zip(handles, labels):
-        if l not in seen:
-            seen.add(l)
-            h2.append(h)
-            l2.append(l)
-    fig.legend(h2, l2, loc='upper center', bbox_to_anchor=(0.5, 1.12),
-               ncol=len(l2), frameon=False, handlelength=1.0,
-               handletextpad=0.4, columnspacing=1.0)
-
-    # NB: neurips.mplstyle uses text.usetex, so a literal '%' must be escaped
-    # (otherwise TeX treats the rest of the line as a comment and drops it).
-    fig.suptitle(f'{target} -- {aggname} RMSE '
-                 f'({ci:.0f}\\% site-bootstrap CI, n={n_boot})',
-                 y=1.18, fontsize='small')
+    # Single shared legend over all panels, in model order.
+    by_label = {}
+    for ax in axes.flat:
+        for h, l in zip(*ax.get_legend_handles_labels()):
+            by_label.setdefault(l, h)
+    labels = [m for m in models if m in by_label]
+    fig.legend([by_label[l] for l in labels], labels, loc='upper center',
+               bbox_to_anchor=(0.5, 1.04), ncol=len(labels), frameon=False,
+               handlelength=1.0, handletextpad=0.4, columnspacing=1.0)
 
     os.makedirs(outdir, exist_ok=True)
-    out = f'{outdir}/scale_rmse_{aggname}_{target}.png'
+    out = f'{outdir}/scale_rmse_{target}.png'
     fig.savefig(out, bbox_inches='tight', dpi=300)
     plt.close(fig)
     logger.info(f"Saved {out}")
     print(f"Saved {out}")
 
+    df = pd.DataFrame(all_rows)
+
     # CI width at the hourly scale, absolute and as % of the point estimate.
     unit = ' (x100)' if target == 'ET' else ''
-    print(f"\n[{target} | {aggname} RMSE{unit}] "
-          f"hourly-scale {ci:.0f}% CI width per scenario:")
-    print(f"  {'scenario':<12} {'model':<9} {'point':>8} "
-          f"{'CI width':>9} {'% of point':>11}")
-    for setting in SETTINGS:
-        for (s, model, point, lo, hi) in hourly_rows:
-            if s != setting:
-                continue
-            width = hi - lo
-            pct = 100.0 * width / abs(point) if point else float('nan')
-            print(f"  {SETTING_NAMES.get(setting, setting):<12} {model:<9} "
-                  f"{point:>8.3f} {width:>9.3f} {pct:>10.1f}%")
+    for aggname in AGGS:
+        print(f"\n[{target} | {aggname} RMSE{unit}] "
+              f"hourly-scale {ci:.0f}% CI width per scenario:")
+        print(f"  {'scenario':<12} {'model':<13} {'point':>8} "
+              f"{'CI width':>9} {'% of point':>11}")
+        hourly = df[(df['agg'] == aggname) & (df['scale'] == 'hourly')]
+        for row in hourly.itertuples():
+            print(f"  {row.scenario:<12} {row.model:<13} {row.point:>8.3f} "
+                  f"{row.ci_width:>9.3f} {row.ci_width_pct_of_point:>10.1f}%")
 
-    # Full table (all scales) to CSV, alongside the figure.
-    csv_out = f'{outdir}/scale_rmse_{aggname}_{target}_ci.csv'
-    pd.DataFrame(all_rows).to_csv(csv_out, index=False)
+    # Full table (both aggregates, all scales) to CSV, alongside the figure.
+    csv_out = f'{outdir}/scale_rmse_{target}_ci.csv'
+    df.to_csv(csv_out, index=False)
     logger.info(f"Saved {csv_out}")
     print(f"Saved {csv_out}")
 
@@ -249,9 +253,8 @@ def main():
         plt.style.use(STYLE_FILE_PATH)
 
     for target in targets:
-        for aggname in ('median', 'q90'):
-            plot_target(results, target, aggname,
-                        args.n_boot, args.ci, args.seed, args.outdir)
+        plot_target(results, target,
+                    args.n_boot, args.ci, args.seed, args.outdir)
 
 
 if __name__ == "__main__":
