@@ -65,7 +65,7 @@ Once you have trained a model, we wish to evaluate it over the median and 90th p
 In more detail, one can look at the CDFs for an (extapolation scenario, aggregation) pair. For example,  for RMSE of weekly GPP in the temperature-based extrapolation, we see that LSTM and Group DRO appear similar at the median and diverge further in the tails.
 
 <p align="center">
-  <img src="figures/cdf_weekly.png" alt="cdf" width="60%">
+  <img src="figures/cdf_weekly.png" alt="cdf" width="80%">
 </p>
 
 ---
