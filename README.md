@@ -11,7 +11,7 @@ A benchmark for evaluating ML models under distribution shift using FLUXNET eddy
 
 ## Leaderboard
 
-A leaderboard is available at [link removed for anonymity], with submissions accepted via an upload form.
+Results are available at the [FLUXtrapolation leaderboard](https://anyafries.github.io/FLUXtrapolation-leaderboard/index.html#ET). Submissions accepted via an upload form there.
 
 ---
 
@@ -29,7 +29,7 @@ PyTorch uses CPU by default. For GPU support, install the appropriate CUDA versi
 
 ## Data
 
-The data consists of one CSV per FLUXNET site, available on Harvard Dataverse (link included here after the review process, currently available in the link in the paper).
+The data consists of one CSV per FLUXNET site, available on [Harvard Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/Q1MPVG).
 All the sites should be downloaded and saved in `data/sites/`. 
 
 The data consists of **13 covariates** per hourly observation:
@@ -58,12 +58,14 @@ Run `--setting all` to run all three (default).
 
 Once you have trained a model, we wish to evaluate it over the median and 90th percentile of held-out sites and site-years, along with several temporal aggregates. For example, we can look at ET and the 90th percentiles of RMSE. Good models do not degrade badly for any of the metrics.
 
-![q90_table](figures/q90_table.png)
+<p align="center">
+  <img src="figures/q90_table.png" alt="q90_table" width="90%">
+</p>
 
-In more detail, one can look at the CDFs for an (extapolation scenario, aggregation) pair. For example for RMSE of weekly ET in the temperature-based extrapolation, we see that models whcih appear more similar at the median diverge further in the tails.
+In more detail, one can look at the CDFs for an (extapolation scenario, aggregation) pair. For example,  for RMSE of weekly GPP in the temperature-based extrapolation, we see that LSTM and Group DRO appear similar at the median and diverge further in the tails.
 
 <p align="center">
-  <img src="figures/cdf_ET_rmse_weekly.png " alt="cdf" width="30%">
+  <img src="figures/cdf_weekly.png" alt="cdf" width="60%">
 </p>
 
 ---
