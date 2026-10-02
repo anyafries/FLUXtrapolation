@@ -33,7 +33,9 @@ import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from eval import load_all_metrics  # noqa: E402
-from utils.plots import get_model_colors, get_ordered_models  # noqa: E402
+from utils.plots import (  # noqa: E402
+    get_model_colors, get_model_name, get_ordered_models,
+)
 from utils.utils import setup_logging  # noqa: E402
 
 logger = setup_logging(__name__)
@@ -188,7 +190,8 @@ def plot_target(results, target, n_boot, ci, seed, outdir):
         for h, l in zip(*ax.get_legend_handles_labels()):
             by_label.setdefault(l, h)
     labels = [m for m in models if m in by_label]
-    fig.legend([by_label[l] for l in labels], labels, loc='upper center',
+    fig.legend([by_label[l] for l in labels],
+               [get_model_name(l) for l in labels], loc='upper center',
                bbox_to_anchor=(0.5, 1.04), ncol=len(labels), frameon=False,
                handlelength=1.0, handletextpad=0.4, columnspacing=1.0)
 

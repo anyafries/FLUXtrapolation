@@ -9,6 +9,7 @@ from utils.plots import (
     get_pivot_df_with_scores,
     format_sig_figs,
     get_hex_relative_color,
+    get_model_name,
 )
 
 
@@ -74,6 +75,7 @@ def create_latex_leaderboard(
             lambda x: f"\\textbf{{{x:.2f}}}" if pd.notna(x) else "-"
         )
 
+    latex_df.index = latex_df.index.map(get_model_name)
     latex_df.index.name = None
 
     # --- 4. Rename Settings ---
@@ -97,7 +99,9 @@ def create_latex_leaderboard(
 
     for setting, scale in latex_df.columns:
         if setting != prev_setting:
-            col_format += "@{\\hspace{1.5em}}"
+            # Narrower gap before the skill score than between scenarios.
+            gap = "0.7em" if setting == 'Summary' else "1em"
+            col_format += f"@{{\\hspace{{{gap}}}}}"
             prev_setting = setting
 
         col_format += "c"

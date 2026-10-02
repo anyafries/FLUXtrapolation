@@ -32,6 +32,19 @@ MODEL_COLORS = {
     'constant':      "#969696",
 }
 MODEL_ORDER = list(MODEL_COLORS)
+# Display names used in the paper figures and tables.
+MODEL_NAMES = {
+    'xgb':           'XGBoost',
+    'mlp':           'MLP',
+    'lstm':          'LSTM',
+    'gdro':          'GroupDRO',
+    'coral':         'CORAL',
+    'mmd':           'MMD',
+    'tabpfn-v2.6':   'TabPFN2.6',
+    'tabpfn-v3-ood': 'TabPFN3-ood',
+    'lr':            'Linear reg.',
+    'constant':      'Constant',
+}
 _USED_COLORS = set(MODEL_COLORS.values())
 _EXTRA_PALETTE = [c for c in map(to_hex, sns.color_palette("Set2") + sns.color_palette("tab20"))
                   if c not in _USED_COLORS]
@@ -48,6 +61,11 @@ def get_model_colors(models):
     for i, model in enumerate(extras):
         colors[model] = _EXTRA_PALETTE[i % len(_EXTRA_PALETTE)]
     return colors
+
+
+def get_model_name(model):
+    """Display name of a model; models without one keep their key."""
+    return MODEL_NAMES.get(model, model)
 
 
 def get_ordered_models(models):

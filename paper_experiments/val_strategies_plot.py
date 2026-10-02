@@ -6,7 +6,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from eval import load_all_metrics
-from utils.plots import get_model_colors, get_ordered_models
+from utils.plots import get_model_colors, get_model_name, get_ordered_models
 from utils.utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -62,7 +62,8 @@ def plot_val_comparison(data, x_col, x_order, title_suffix, filename_suffix):
         if legend_ax is not None:
             handles, labels = legend_ax.lines, get_ordered_models(agg['model'].unique())
             handles = [legend_ax.lines[i] for i in range(len(labels))]
-            fig.legend(handles, labels, loc='lower center', ncol=5,
+            fig.legend(handles, [get_model_name(m) for m in labels],
+                       loc='lower center', ncol=5,
                        fontsize=7, bbox_to_anchor=(0.5, -0.05))
 
         fig.suptitle(f'{target} — {title_suffix}')

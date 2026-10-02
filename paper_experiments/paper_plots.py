@@ -15,7 +15,7 @@ from paper_plot_utils import (
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from eval import load_all_metrics
-from utils.plots import plot_cdf
+from utils.plots import get_model_name, plot_cdf
 from utils.utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -121,8 +121,10 @@ if __name__ == "__main__":
             axes[0].get_legend().remove()
         if axes[1].get_legend() is not None:
             axes[1].get_legend().remove()
+        handles, labels = axes[2].get_legend_handles_labels()
         leg = axes[2].legend(
-            title="", 
+            handles, [get_model_name(m) for m in labels],
+            title="",
             frameon=True, 
             handlelength=0.6,
             handleheight=0.4,
