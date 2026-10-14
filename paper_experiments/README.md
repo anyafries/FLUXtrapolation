@@ -129,3 +129,24 @@ display_names = {
 python eval.py
 ```
 
+---
+
+## TabPFN ablations: context size and ensemble size
+
+Two ablations over the TabPFN checkpoints (`v2.5`, `v2.6`, `v3`, `v3-ood`), each run across all three extrapolation scenarios:
+
+- **context** — `n_estimators=1`, varying the number of training rows the model is conditioned on (`subsample_samples`). Every version is run at its own default context and at each smaller one (v2.5: 10k/30k; v2.6: 10k/30k/100k; v3: 10k/30k/100k/1M), so the versions overlap at the short-context end.
+- **estimators** — each version fixed at its base context (v2.5: 30k, v2.6: 100k, v3: 100k) while `n_estimators` varies over 1/2/4.
+
+Naming convention: Each version's default configuration — the one `get_random_params` defines for it — keeps the plain benchmark name (`tabpfn-v2.5`, `tabpfn-v2.6`, `tabpfn-v3`), so runs already made with `train_model.py` are reused as they are. Every other configuration gets a suffixed name (`tabpfn-v2.6-ctx30k`, `tabpfn-v3-ctx100k-n4`). The `n_estimators=1` point is shared between the two ablations and computed only once. Requires the checkpoints in `model_artifacts/` (see the main README).
+
+```bash
+python paper_experiments/tabpfn_ablation_run.py --ablation both --target ET --device cuda:0
+python paper_experiments/tabpfn_ablation_plot.py --ablation both --target ET
+```
+
+Useful flags: `--versions` (subset of `v2.5 v2.6 v3`), `--setting`, `--rerun`, and `--device` (without it TabPFN claims every visible GPU). Completed configurations are skipped. Timings are appended to `results/experiments/tabpfn_ablation_runtimes.csv`.
+
+Outputs: saved to `paper_experiments/plots/tabpfn_ablation/`, for each ablation:
+- `{ablation}_{target}_{baseline}-baseline.pdf` / `.png` — skill score relative to `--baseline` (default `lr`), averaged over all 18 (scenario, scale) cells and within each scenario; solid = median of the domain-level RMSE, dashed = 90th percentile, grey = XGBoost fitted on the full training split
+- `{ablation}_{target}_{baseline}-baseline.csv` — the plotted numbers

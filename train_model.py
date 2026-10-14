@@ -82,9 +82,9 @@ if __name__ == "__main__":
             # Hyperparameter tuning loop
             logger.info(f"Starting random search for {model_name} on {setting}-{target}...")
             param_grid = get_random_params(model_name)
+            tune = len(param_grid) > 1
             best = {s: {'score': float('inf'), 'params': None, 'model': None}
                     for s in ['mean', 'max', 'discrepancy']}
-            
             for i, params in enumerate(param_grid):
                 # Get model and train
                 model = get_model(model_name, params)
@@ -110,6 +110,14 @@ if __name__ == "__main__":
 
                 # Train model
                 model.fit(**fit_args)
+
+                if not tune:
+                    # Only one candidate: it wins every strategy regardless of
+                    # score, so there is nothing to validate.
+                    logger.info("Single candidate; skipping validation scoring.")
+                    for s in best:
+                        best[s].update({'score': None, 'params': params, 'model': model})
+                    continue
 
                 # Evaluate on validation set
                 val_preds = model.predict(xval)
@@ -138,13 +146,16 @@ if __name__ == "__main__":
             # Final evaluation on test set with best model per strategy
             logger.info("Model selection complete.")
             logger.info(f"Saving predictions and metrics for {setting}/{target}/{model_name}...")
+            ypred = None
             for strategy, b in best.items():
-                logger.info(f"  [{strategy}] Best val score: {b['score']:.4f}, params: {b['params']}")
+                score_str = f"{b['score']:.4f}" if b['score'] is not None else "n/a (single candidate)"
+                logger.info(f"  [{strategy}] Best val score: {score_str}, params: {b['params']}")
                 save_best_params(b['params'], setting, target, model_name,
                                  val_strategy=strategy, val_score=b['score'])
                 if model_name in DEEP_MODELS:
                     save_model(b['model'], b['params'], len(feature_cols),
                                setting, target, model_name, val_strategy=strategy)
-                ypred = b['model'].predict(xtest)
+                if ypred is None or tune:
+                    ypred = b['model'].predict(xtest)
                 preds_df = save_predictions(test, ypred, setting, target, model_name, val_strategy=strategy)
                 compute_and_save_metrics(preds_df, setting, target, model_name, val_strategy=strategy)

@@ -4,6 +4,7 @@ fluxnet_bench_venv/*
 .DS_Store
 
 # big folders
+model_artifacts/
 data/*
 !data/sites_with_2018.csv
 !data/sites/

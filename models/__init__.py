@@ -12,6 +12,13 @@ Available models:
   - 'coral'         : CORAL domain adaptation
   - 'mmd'           : MMD domain adaptation (fixed multi-scale kernel bandwidths)
   - 'mmd-median'    : MMD domain adaptation (median-heuristic kernel bandwidth)
+<<<<<<< HEAD
+  - 'maxrm_mse'     : MaxRM Random Forest with MSE risk
+  - 'maxrm_regret'  : MaxRM Random Forest with regret risk
+  - 'tabpfn-v2.5'   : TabPFN prior-data fitted network regressor
+                       ('tabpfn-v2.5', 'tabpfn-v2.6', 'tabpfn-v3', 'tabpfn-v3-ood')
+=======
+>>>>>>> upstream/main
 """
 
 import numpy as np
@@ -93,10 +100,19 @@ def get_model(model_name, params=None):
         from .coral import MMD
         return MMD(bandwidth_mode="median", **params)
 
+    elif model_name.startswith('tabpfn'):
+        from .tabpfn import TabPFN
+        version = model_name.removeprefix('tabpfn').lstrip('-')
+        if not version:
+            raise ValueError(
+                "Use an explicit TabPFN version, e.g. 'tabpfn-v2.5'."
+            )
+        return TabPFN(version=version, **params)
+
     else:
         raise NotImplementedError(
             f"Model `{model_name}` not implemented. "
-            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'lstm', 'gdro', 'coral', 'mmd', 'mmd-median'"
+            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'lstm', 'gdro', 'coral', 'mmd', 'mmd-median', 'tabpfn-v2.5', 'tabpfn-v2.6', 'tabpfn-v3', 'tabpfn-v3-ood'"
         )
 
 
@@ -122,6 +138,19 @@ def get_random_params(model_name, n_iter=20):
 
     if model_name in ['lr', 'constant']:
         return [{}]
+
+    if model_name == 'tabpfn-v2.5':
+        return [
+            {'n_estimators': 1, 'subsample_samples': 30_000, 'random_state': 42}
+            ]
+    if model_name == 'tabpfn-v2.6':
+        return [
+            {'n_estimators': 1, 'subsample_samples': 100_000, 'random_state': 42},
+        ]
+    if model_name in ['tabpfn-v3', 'tabpfn-v3-ood']:
+        return [
+            {'n_estimators': 1, 'subsample_samples': 1_000_000, 'random_state': 42},
+        ]
 
     random_configs = []
     n_off = max(1, n_iter // 10)   # reserve ~1 penalty-off (ERM) config per 10 draws
