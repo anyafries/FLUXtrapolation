@@ -54,7 +54,7 @@ The CSV that is already present at `data/sites_with_2018.csv` is a list of site 
 
 |  | `time-split` | `spatial-easy40` | `TA40` |
 |--|---|---|---|
-| **Description** | Train on years before 2018, validate on 2018, test on years after 2018 | Hold out 40 predefined test sites; train/validate on the rest | Hold out 25 warmer southern sites; train/validate on northern sites |
+| **Description** | Train on years before 2018, validate on 2018, test on years after 2018 | Hold out 40 predefined (randomly selected) test sites; validate on 20 | Hold out the 40 warmest sies, validate on 20 |
 | **Diagram** | ![time-split](figures/time_split.png) | ![spatial-easy](figures/site_split_space.png) | ![ta-split](figures/site_split_ta.png) |
 | **Tests** | Temporal generalization — can a model trained on earlier years predict future flux dynamics? | Spatial generalization to new ecosystems across climate types | Robustness to a climate gradient — training and test sites differ systematically in temperature regime |
 
