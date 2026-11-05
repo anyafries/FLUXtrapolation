@@ -12,13 +12,6 @@ Available models:
   - 'coral'         : CORAL domain adaptation
   - 'mmd'           : MMD domain adaptation (fixed multi-scale kernel bandwidths)
   - 'mmd-median'    : MMD domain adaptation (median-heuristic kernel bandwidth)
-<<<<<<< HEAD
-  - 'maxrm_mse'     : MaxRM Random Forest with MSE risk
-  - 'maxrm_regret'  : MaxRM Random Forest with regret risk
-  - 'tabpfn-v2.5'   : TabPFN prior-data fitted network regressor
-                       ('tabpfn-v2.5', 'tabpfn-v2.6', 'tabpfn-v3', 'tabpfn-v3-ood')
-=======
->>>>>>> upstream/main
 """
 
 import numpy as np
