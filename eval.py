@@ -142,8 +142,6 @@ if __name__ == "__main__":
                         outdir=plots_dir, metric=metric)
         plot_cdf_grid(results, target, scale='hourly', metric=metric, 
                       settings_names=display_names, outdir=plots_dir)
-        plot_cdf_grid(results, target, scale='daily', metric=metric, 
-                      settings_names=display_names, outdir=plots_dir)
         plot_cdf_grid(results, target, scale='weekly', metric=metric, 
                       settings_names=display_names, outdir=plots_dir)
         create_html_leaderboard(results, target, metric='rmse',
