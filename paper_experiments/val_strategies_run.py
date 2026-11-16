@@ -93,7 +93,7 @@ if __name__ == "__main__":
                         fit_args['eval_set'] = [(xval, yval)]
                     if use_envs:
                         fit_args['envs'] = envs_train.values
-                    if model_name in ['xgb', 'xgb_conservative']:
+                    if model_name == 'xgb':
                         fit_args['verbose'] = False
                     if use_feature_names:
                         fit_args['feature_names'] = feature_cols

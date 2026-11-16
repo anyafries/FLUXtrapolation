@@ -4,8 +4,7 @@ Model definitions for FLUXNET benchmark.
 Available models:
   - 'lr'            : Linear Regression (sklearn)
   - 'ridge'         : Ridge Regression (sklearn)
-  - 'xgb'              : XGBoost Regressor
-  - 'xgb_conservative' : XGBoost with conservative feature set (TA, VPD, SW_IN, EVI, NDWI_SWIR2, PFT_*)
+  - 'xgb'           : XGBoost Regressor
   - 'mlp'           : Multi-layer Perceptron
   - 'lstm'          : Seq2seq LSTM baseline on the hourly series (sequential)
   - 'gdro'          : Group DRO (worst-group loss minimization)
@@ -45,10 +44,6 @@ def get_model(model_name, params=None):
         from xgboost import XGBRegressor
         return XGBRegressor(**params)
 
-    elif model_name == 'xgb_conservative':
-        from .xgb_conservative import XGBConservative
-        return XGBConservative(**params)
-    
     elif model_name == 'lr':
         from sklearn.linear_model import LinearRegression
         return LinearRegression()
@@ -105,7 +100,7 @@ def get_model(model_name, params=None):
     else:
         raise NotImplementedError(
             f"Model `{model_name}` not implemented. "
-            f"Available models: 'xgb', 'xgb_conservative', 'lr', 'ridge', 'mlp', 'lstm', 'gdro', 'coral', 'mmd', 'mmd-median', 'tabpfn-v2.5', 'tabpfn-v2.6', 'tabpfn-v3', 'tabpfn-v3-ood'"
+            f"Available models: 'xgb', 'lr', 'ridge', 'mlp', 'lstm', 'gdro', 'coral', 'mmd', 'mmd-median', 'tabpfn-v2.5', 'tabpfn-v2.6', 'tabpfn-v3', 'tabpfn-v3-ood'"
         )
 
 
@@ -161,7 +156,7 @@ def get_random_params(model_name, n_iter=20):
                 'epsilon': float(np_rng.uniform(1.1, 2.0))
             }
 
-        elif model_name in ['xgb', 'xgb_conservative']:
+        elif model_name == 'xgb':
             params = {
                 'n_estimators': rng.randint(100, 1000),
                 'max_depth': rng.randint(3, 10),
